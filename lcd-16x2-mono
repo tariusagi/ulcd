@@ -1,0 +1,66 @@
+#!/usr/bin/python3
+import os
+import sys
+import getopt
+import board
+import digitalio
+import adafruit_character_lcd.character_lcd as characterlcd
+
+VERSION = "0.1"
+PROGRAM = os.path.basename(__file__)
+USAGE = f"""\
+{PROGRAM} version {VERSION}.
+Syntax: {PROGRAM} [option] [text]
+Options:
+-?      Display this help and exit.
+
+Where:
+- text: text to display onto the LCD. If this is absent, then this program will
+just clear the screen.
+"""
+
+# Modify this if you have a different sized character LCD
+lcd_columns = 16
+lcd_rows = 2
+
+# compatible with all versions of RPI as of Jan. 2019
+# v1 - v3B+
+lcd_rs = digitalio.DigitalInOut(board.D25)
+lcd_en = digitalio.DigitalInOut(board.D24)
+lcd_d4 = digitalio.DigitalInOut(board.D23)
+lcd_d5 = digitalio.DigitalInOut(board.D17)
+lcd_d6 = digitalio.DigitalInOut(board.D18)
+lcd_d7 = digitalio.DigitalInOut(board.D22)
+
+
+def main():
+    # Handle commandline arguments.
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], '?cv')
+    except getopt.error as err:
+        print(f'ERROR: {str(err)}. Use "-?" for usage.', file = sys.stderr)
+        sys.exit(1)
+    for o, v in opts:
+        if o == '-?':
+            print(USAGE)
+            sys.exit(0)
+    if len(args) == 0:
+        print(f'Expecting text(s) to display. Use "-?" for usage.'
+            , file = sys.stderr)
+    else:
+        text = ""
+        # Build the text to display. Each input will be in a separated line.
+        for s in args:
+            if text == "":
+                text = s
+            else:
+                text = text + "\n" + s
+        # Initialise the lcd class
+        lcd = characterlcd.Character_LCD_Mono(lcd_rs, lcd_en, lcd_d4, lcd_d5,
+            lcd_d6, lcd_d7, lcd_columns, lcd_rows)
+        # Now display the text.
+        lcd.message = text
+
+# Main entry.
+if __name__ == '__main__':
+	main()
