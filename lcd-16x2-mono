@@ -1,22 +1,31 @@
 #!/usr/bin/python3
+import time
 import os
 import sys
 import getopt
 import board
 import digitalio
 import adafruit_character_lcd.character_lcd as characterlcd
+import asyncio
+import signal
 
-VERSION = "0.1"
+VERSION = "0.2"
 PROGRAM = os.path.basename(__file__)
 USAGE = f"""\
 {PROGRAM} version {VERSION}.
-Syntax: {PROGRAM} [option] [text]
+Display text onto LCD screen.
+Syntax: {PROGRAM} [option]
 Options:
--?      Display this help and exit.
+-?	    Display this help and exit.
+-1 path File to read first line.
+-2 path File to read second line.
+-i n    Set scrolling interval (float). Default is 0.5 (second).
+-t n    Terminate after n seconds. Otherwise run indefinitely.
+-n      No scolling (default is scroll long text).
+-v      Run verbose.
 
-Where:
-- text: text to display onto the LCD. If this is absent, then this program will
-just clear the screen.
+Note: if the g_lines to display is wider than 16 characters, then they will be
+bound back and forth indefinitely or until time up.
 """
 
 # Modify this if you have a different sized character LCD
@@ -32,34 +41,210 @@ lcd_d5 = digitalio.DigitalInOut(board.D17)
 lcd_d6 = digitalio.DigitalInOut(board.D18)
 lcd_d7 = digitalio.DigitalInOut(board.D22)
 
+def pad16(s):
+	""" Padd input string with spaces to make its length 16"""
+	if s is not None and len(s) < 16:
+		for i in range(16 - len(s)):
+			s += " "
+	return s
+
+def rotate_left(s):
+	""" Rotate the given string 1 character to the left, pads with 4 spaces"""
+	l = list(s)
+	w = len(l)
+	# Store the last character.
+	c = l[0]
+	# Now shift the string to the left.
+	for n in range(w):
+		if n == (w - 1):
+			l[n] = c
+		else:
+			l[n] = l[n + 1]
+	return "".join(l)
+
+def rotate_right(s):
+	""" Rotate the given string 1 character to the right, pads with 4 spaces"""
+	l = list(s)
+	w = len(l)
+	# Store the last character.
+	c = l[w - 1]
+	# Now shift the string to the right.
+	for n in reversed(range(w)):
+		if n == 0:
+			l[0] = c
+		else:
+			l[n] = l[n - 1]
+	return "".join(l)
+
+async def timer(timeout):
+	if g_verbose: print(f"timer: waiting for {timeout} seconds...")
+	await asyncio.sleep(timeout)
+	if g_verbose: print("timer: timed out. Cancelling tasks...")
+	for task in asyncio.all_tasks():
+		task.cancel()
+	print("timer: all done.")
+
+def sig_handler():
+	if g_verbose: print("sig_handler: cancelling tasks...")
+	for task in asyncio.all_tasks():
+		task.cancel()
+	if g_verbose: print("sig_handler: all done.")
+
+async def display(lcd, scroll, interval):
+	""" Display g_lines on LCD. Texts will be get from a global array """
+	global g_lines
+	lines = [None, None]
+	buf = [None, None]
+	directions = [None, None] # None = no scroll, 0 = left, 1 = right.
+	steps = [0, 0] # Scroll steps.
+	displays = [None, None]
+	if g_verbose: print("display: started.")
+	while True:
+		try:
+			for i in range(2):
+				check = False
+				display = False
+				if directions[i] is None:
+					# No scrolling. Mark to check for content update.
+					check = True
+				elif steps[i] == (len(lines[i]) - 16):
+					# Done scrolling left or right. Switch direction, also
+					# allow checking for update.
+					if g_verbose: print(f"display: line {i + 1} switching direction.")
+					directions[i] = 0 if directions[i] == 1 else 1
+					steps[i] = 0
+					check = True
+				else:
+					# Still scrolling...
+					if directions[i] == 0:
+						# Scrolling left.
+						buf[i] = rotate_left(buf[i])
+						if g_verbose: print(f"display: line {i + 1} switch to the left.")
+					else:
+						# Scrolling right.
+						buf[i] = rotate_right(buf[i])
+						if g_verbose: print(f"display: line {i + 1} switch to the right.")
+					steps[i] += 1
+					# Mark for display.
+					display = True
+				if check and (lines[i] != g_lines[i]):
+					# New content.
+					lines[i] = g_lines[i]
+					if g_verbose: print(f"display: line {i + 1} has new content: \"{lines[i]}\".")
+					buf[i] = lines[i]
+					# Mark for display.
+					display = True
+					if len(lines[i]) > 16:
+						# Line longer than display, need scrolling.
+						directions[i] = 0
+						steps[i] = 0
+					else:
+						# Line is within display, no need for scrolling.
+						directions[i] = None
+						# But need to add spaces to make it 16 in length.
+						buf[i] = pad16(buf[i])
+				if display:
+					if g_verbose: print(f"display: line {i + 1} display as \"{buf[i][0:16]}\".")
+					lcd.cursor_position(0, i)
+					lcd.message = buf[i][0:16]
+			# After each cycle, wait a bit.
+			await asyncio.sleep(interval)
+		except asyncio.CancelledError:
+			if g_verbose: print("display: got cancelled.")
+			break
+	if g_verbose: print("display: all done.")
+
+async def read_file(path1, path2):
+	""" Read at most first 2 g_lines from given file into a global array."""
+	if g_verbose: print("read_file: started.")
+	paths = (path1, path2)
+	while True:
+		try:
+			for i in range(2):
+				if paths[i] is None:
+					break
+				if g_verbose: print(f"read_file: reading from {paths[i]}...")
+				s = None
+				try:
+					with open(paths[i], "r") as f:
+						s = f.readline().strip()
+				except OSError:
+					if g_verbose: print(f"read_file: error reading from {paths[i]}")
+				if s is None:
+					s = ""
+				if g_lines[i] != s:
+					g_lines[i] = s
+					if g_verbose: print(f'read_file: line {i + 1} changed to "{s}".')
+			# Wait 1 second before trying to read file again.
+			await asyncio.sleep(1)
+		except asyncio.CancelledError:
+			if g_verbose: print("read_file: got cancelled.")
+			break
+	if g_verbose: print("read_file: all done.")
+
+g_verbose = False
+g_lines = [None, None]
 
 def main():
-    # Handle commandline arguments.
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], '?cv')
-    except getopt.error as err:
-        print(f'ERROR: {str(err)}. Use "-?" for usage.', file = sys.stderr)
-        sys.exit(1)
-    for o, v in opts:
-        if o == '-?':
-            print(USAGE)
-            sys.exit(0)
-    if len(args) == 0:
-        print(f'Expecting text(s) to display. Use "-?" for usage.'
-            , file = sys.stderr)
-    else:
-        text = ""
-        # Build the text to display. Each input will be in a separated line.
-        for s in args:
-            if text == "":
-                text = s
-            else:
-                text = text + "\n" + s
-        # Initialise the lcd class
-        lcd = characterlcd.Character_LCD_Mono(lcd_rs, lcd_en, lcd_d4, lcd_d5,
-            lcd_d6, lcd_d7, lcd_columns, lcd_rows)
-        # Now display the text.
-        lcd.message = text
+	global g_verbose
+	global g_lines
+	# Default settings.
+	interval = 0.5
+	scroll = True
+	path1 = None
+	path2 = None
+	timeout = None
+	if len(sys.argv) < 2:
+		print(USAGE)
+		sys.exit(0)
+	# Handle commandline arguments.
+	try:
+		opts, args = getopt.getopt(sys.argv[1:], '?1:2:i:nt:v')
+	except getopt.error as err:
+		print(f'ERROR: {str(err)}. Use "-?" for usage.', file = sys.stderr)
+		sys.exit(1)
+	for o, v in opts:
+		if o == '-?':
+			print(USAGE)
+			sys.exit(0)
+		elif o == '-1':
+			path1 = v
+		elif o == '-2':
+			path2 = v
+		elif o == '-i':
+			interval = float(v)
+		elif o == '-n':
+			scroll = False
+		elif o == '-t':
+			timeout = int(v)
+		elif o == '-v':
+			g_verbose = True
+		else:
+			print(f'ERROR: Unrecognized option. Use "-?" for usage.', file = sys.stderr)
+			sys.exit(2)
+	if path1 is None and path2 is None:
+		print(f'ERROR: Missing input file(s).', file = sys.stderr)
+		sys.exit(3)
+	# Initialise the lcd class
+	lcd = characterlcd.Character_LCD_Mono(lcd_rs, lcd_en, lcd_d4, lcd_d5,
+		lcd_d6, lcd_d7, lcd_columns, lcd_rows)
+	# Start running in a asyncio loop.
+	if g_verbose: print("main: started.")
+	if timeout is not None:
+		# Include a timer of timeout is set.
+		tasks = asyncio.gather(timer(timeout), read_file(path1, path2), display(lcd, scroll, interval))
+	else:
+		tasks = asyncio.gather(read_file(path1, path2), display(lcd, scroll, interval))
+	loop = asyncio.get_event_loop()
+	for sig in (signal.SIGINT, signal.SIGTERM):
+		loop.add_signal_handler(sig, sig_handler)
+	try:
+		loop.run_until_complete(tasks)
+	except asyncio.CancelledError:
+		pass
+	for sig in (signal.SIGINT, signal.SIGTERM):
+		loop.remove_signal_handler(sig)
+	if g_verbose: print("main: all done.")
 
 # Main entry.
 if __name__ == '__main__':
