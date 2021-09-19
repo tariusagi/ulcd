@@ -16,13 +16,12 @@ USAGE = f"""\
 Display text onto LCD screen.
 Syntax: {PROGRAM} [OPTION] [LINE1] [LINE2]
 OPTION:
--?	    Display this help and exit.
+-?      Display this help and exit.
 -c      Clear the LCD.
 -1 path File to read first line, imply daemon mode.
 -2 path File to read second line, imply daemon mode.
 -i n    Set scrolling interval (float). Default is 0.5 (second).
 -t n    Terminate after n seconds. Otherwise run indefinitely.
--n      No scolling (default is scroll long text).
 -v      Run verbose.
 LINE1   A text to display in line 1. This override -1 and -2 options.
 LINE2   A text to display in line 2. This override -1 and -2 options.
@@ -98,7 +97,7 @@ def sig_handler():
 		task.cancel()
 	if g_verbose: print("sig_handler: all done.")
 
-async def display(lcd, scroll, interval):
+async def display(lcd, interval):
 	""" Display g_lines on LCD. Texts will be get from a global array """
 	global g_lines
 	lines = [None, None]
@@ -199,7 +198,6 @@ def main():
 	# Default settings.
 	clear = False
 	interval = 0.5
-	scroll = True
 	path1 = None
 	path2 = None
 	timeout = None
@@ -210,7 +208,7 @@ def main():
 		sys.exit(0)
 	# Handle commandline arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], '?1:2:ci:nt:v')
+		opts, args = getopt.getopt(sys.argv[1:], '?1:2:ci:t:v')
 	except getopt.error as err:
 		print(f'ERROR: {str(err)}. Use "-?" for usage.', file = sys.stderr)
 		sys.exit(1)
@@ -226,8 +224,6 @@ def main():
 			path2 = v
 		elif o == '-i':
 			interval = float(v)
-		elif o == '-n':
-			scroll = False
 		elif o == '-t':
 			timeout = int(v)
 		elif o == '-v':
@@ -267,10 +263,10 @@ def main():
 			# Include a timer of timeout is set.
 			tasks = asyncio.gather(timer(timeout),
 				read_file(path1, path2),
-				display(lcd, scroll, interval))
+				display(lcd, interval))
 		else:
 			tasks = asyncio.gather(read_file(path1, path2),
-				display(lcd, scroll, interval))
+				display(lcd, interval))
 		loop = asyncio.get_event_loop()
 		for sig in (signal.SIGINT, signal.SIGTERM):
 			loop.add_signal_handler(sig, sig_handler)
