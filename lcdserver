@@ -1,0 +1,87 @@
+#!/usr/bin/bash
+log() {
+	echo PID $$: $* >> /var/log/lcdserver.log
+}
+
+# This script must be run as root/sudo.
+if [ $(id -u) -ne 0 ]; then
+	echo ERROR: must run as root/sudo.
+	exit 1
+fi
+
+# This script's full path name.
+SCRIPT_FULLPATH=$(readlink -f $0)
+# This script's absolute directory (without trailing slash).
+SCRIPT_DIR="$(dirname $SCRIPT_FULLPATH)"
+# This script's base name (file name only, without directory).
+SCRIPT_NAME=$(basename $SCRIPT_FULLPATH)
+
+if [ $# -lt 1 ]; then
+	echo ERROR: missing argument.
+	echo Use \"server ip port\" to run in server mode.
+	echo Use \"worker\" to run as a worker.
+	exit 1
+fi
+
+# Check dependencies.
+DEP="ncat"
+
+# Check dependencies first.
+for d in $DEP; do
+	path="$(which ${d})"
+	if [ -z "$path" ]; then
+		echo $d command not found. Please install it first.
+		exit 2
+	fi
+done
+
+if [ "$1" == "server" ]; then
+	# Server mode.
+	if [ $# -lt 3 ]; then
+		echo ERROR: need IP and host to bind to.
+		exit 3
+	fi
+	ip=$2
+	port=$3
+	# Use ncat to listen to connection and let it call this script back in worker mode.
+	ncat -k -l $ip $port -e "$SCRIPT_FULLPATH worker"
+	if [ $? -ne 0 ]; then
+		echo ERROR: ncat server failed.
+		exit 4
+	else
+		echo Server terminated.
+		exit 0
+	fi
+elif [ "$1" == "worker" ]; then
+	# Worker mode.
+	shopt -s nocasematch
+	line1=""
+	line2=""
+	# Read and process stdin line by line.
+	while IFS= read -r line; do
+		cmd=${line%% *}
+		case $cmd in
+			clear)
+				log Clear screen
+				lcd -c
+				;;
+			line1)
+				line1=${line#$cmd }
+				log Line 1 = \"$line1\"
+				;;
+			line2)
+				line2=${line#$cmd }
+				log Line 2 = \"$line2\"
+				;;
+			display)
+				log Display
+				lcd "$line1" "$line2"
+				;;
+			*)
+				log $line
+				;;
+		esac
+	done
+	log EOF
+fi
+
