@@ -66,16 +66,14 @@ elif [ "$1" == "worker" ]; then
 				lcd -c
 				;;
 			line1)
-				line1=${line#$cmd }
-				log Line 1 = \"$line1\"
+				text=${line#$cmd }
+				log Line 1 = \"$text\"
+				lcd -1 "$text"
 				;;
 			line2)
-				line2=${line#$cmd }
-				log Line 2 = \"$line2\"
-				;;
-			display)
-				log Display
-				lcd "$line1" "$line2"
+				text=${line#$cmd }
+				log Line 2 = \"$text\"
+				lcd -2 "$text"
 				;;
 			*)
 				log $line

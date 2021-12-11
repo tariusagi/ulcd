@@ -2,15 +2,30 @@
 
 Display messages and media on various LCD screens via GPIO.
 
-## lcd-16x2-mono
-Display text onto a 16x2 monochrome LCD screen. Based on this [Drive a 16x2 LCD with the Raspberry Pi](https://learn.adafruit.com/drive-a-16x2-lcd-directly-with-a-raspberry-pi/overview). Tested on a Raspberry Pi Zero W.
-### Install
-This program requires Python3 and adafruit-circuitpython-charlcd package. Install it with:
-```sh
-sudo pip3 install adafruit-circuitpython-charlcd
+## lcd-16x2-mono-simple
+Display text onto a 16x2 monochrome LCD screen. Based on this [Interfacing 16x2 LCD with Raspberry Pi](https://www.electronicshub.org/interfacing-16x2-lcd-with-raspberry-pi/). Tested on a Raspberry Pi Zero W.
+
+This is a Python 2 program. It requires the `RPi.GPIO` package. Install it with `pip`.
+
+Usage:
+```
+lcd version 0.1.
+Display text onto an 16x2 monochrome LCD screen.
+Syntax: lcd [OPTION] [LINE1] [LINE2]
+OPTION:
+-h                      Display this help and exit.
+-c                      Clear the LCD.
+-d                      Run a demo.
+-1 text Text to display on line 1.
+-2 text Text to display on line 2.
 ```
 
-### Usage
+## lcd-16x2-mono
+Display text onto a 16x2 monochrome LCD screen. Based on this [Drive a 16x2 LCD with the Raspberry Pi](https://learn.adafruit.com/drive-a-16x2-lcd-directly-with-a-raspberry-pi/overview). Tested on a Raspberry Pi Zero W.
+
+This program requires Python 3 and `adafruit-circuitpython-charlcd` package. Install it with `pip3`.
+
+Usage
 ```
 Syntax: {PROGRAM} [OPTION] [LINE1] [LINE2]
 OPTION:
