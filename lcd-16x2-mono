@@ -210,7 +210,7 @@ def main():
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], 'h1:2:ci:t:v')
 	except getopt.error as err:
-		print(f'ERROR: {str(err)}. Use "-?" for usage.', file = sys.stderr)
+		print(f'ERROR: {str(err)}. Use "-h" for usage.', file = sys.stderr)
 		sys.exit(1)
 	for o, v in opts:
 		if o == '-h':
