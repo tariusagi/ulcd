@@ -46,7 +46,9 @@ if [ "$1" == "server" ]; then
 	# Use ncat to listen to connection and let it call this script back in worker mode.
 	log Start listening at $ip:$port with worker at $SCRIPT_FULLPATH
 	ncat -k -l $ip $port -e "$SCRIPT_FULLPATH worker"
-	log Server terminated with code $?
+	ret=$?
+	log Server terminated with code $ret
+	return $ret
 elif [ "$1" == "worker" ]; then
 	# Worker mode.
 	shopt -s nocasematch
