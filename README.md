@@ -67,3 +67,26 @@ Supported commands are:
 
 The server's log is at `/var/log/lcdserver.log`.
 
+To run this server at boot, use `/etc/rc.local` or create a service file `/etc/systemd/system/lcd.service` like this (assumming path to this server is at `/usr/local/bin/lcdserver`):
+```systemd
+[Unit]
+Description=Display various info on the attached LCD screen
+After=network.service
+
+[Service]
+User=root
+WorkingDirectory=/home/pi/
+ExecStart=/usr/local/bin/lcdserver server 0.0.0.0 1234
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
+Then run:
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable lcd
+sudo systemctl start lcd
+```
+To start the server as a service.
