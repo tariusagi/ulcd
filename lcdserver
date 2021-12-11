@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 log() {
-	echo PID $$: $* >> /var/log/lcdserver.log
+	echo $(date) $$: $* >> /var/log/lcdserver.log
 }
 
 # This script must be run as root/sudo.
@@ -44,14 +44,9 @@ if [ "$1" == "server" ]; then
 	ip=$2
 	port=$3
 	# Use ncat to listen to connection and let it call this script back in worker mode.
+	log Start listening at $ip:$port with worker at $SCRIPT_FULLPATH
 	ncat -k -l $ip $port -e "$SCRIPT_FULLPATH worker"
-	if [ $? -ne 0 ]; then
-		echo ERROR: ncat server failed.
-		exit 4
-	else
-		echo Server terminated.
-		exit 0
-	fi
+	log Server terminated with code $?
 elif [ "$1" == "worker" ]; then
 	# Worker mode.
 	shopt -s nocasematch

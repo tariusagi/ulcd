@@ -1,4 +1,4 @@
-# uzi-lcd
+# Uzi's LCD library
 
 Display messages and media on various LCD screens via GPIO.
 
@@ -30,3 +30,40 @@ indefinitely or until time out (as specified by -t option).
 Daemon can be used only with -1 and/or -2 option(s).  If -1 and -2 option are
 not used, then this program will just display TEXT and then terminate.
 ```
+
+## lcdserver
+Run a network server and serve requests from clients to control the attached LCD. Requires root priviledge.
+
+Usage:
+```sh
+sudo ./lcdserver server 127.0.0.1 1234
+```
+To send command to this server, use `nc`, `ncat` or nay network client. For example, the following command tell the server to clear the LCD:
+```sh
+echo clear | nc -w1 127.0.0.1 1234
+```
+or create a text file containing commands and send it over. For example, with this `cmd.txt`:
+```
+clear
+line1 First line
+line2 Second line
+display
+```
+Run this command to send the commands in that file to the server:
+```sh
+nc -w1 127.0.0.1 1234 < cmd.txt
+```
+And the server will do the following:
+- Clear the LCD.
+- Put "First line" to line 1 buffer.
+- Put "Second line" to line 2 buffer.
+- Display the buffer on the LCD.
+
+Supported commands are:
+- `clear`: Clear the LCD.
+- `line1` text: Show the text on the LCD's first line.
+- `line2` text: Show the text on the LCD's second line.
+- `display`: display line 1 and line 2 on the LCD.
+
+The server's log is at `/var/log/lcdserver.log`.
+
