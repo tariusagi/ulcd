@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 log() {
 	test -n "$log_enabled" && echo $(date) $$: $* >> /var/log/lcdserver.log
 }
@@ -57,6 +57,14 @@ elif [ "$1" == "worker" ]; then
 	shopt -s nocasematch
 	line1=""
 	line2=""
+	# Create a mutex lock to avoid messing the LCD by simultaneous workers.
+	lock="/var/run/$SCRIPT_NAME"
+	exec 9>$lock
+	log Acquiring lock
+	flock 9
+	log Lock acquired
+	# Write the current PID to lock file.
+	echo $$ 1>&9
 	# Read and process stdin line by line.
 	while IFS= read -r line; do
 		cmd=${line%% *}
