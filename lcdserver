@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 log() {
-	echo $(date) $$: $* >> /var/log/lcdserver.log
+	test -n "$log_enabled" && echo $(date) $$: $* >> /var/log/lcdserver.log
 }
 
 # This script must be run as root/sudo.
@@ -20,6 +20,7 @@ if [ $# -lt 1 ]; then
 	echo ERROR: missing argument.
 	echo Use \"server ip port\" to run in server mode.
 	echo Use \"worker\" to run as a worker.
+	echo Add \"log\" at the end of server mode to enable logging.
 	exit 1
 fi
 
@@ -43,14 +44,16 @@ if [ "$1" == "server" ]; then
 	fi
 	ip=$2
 	port=$3
+	[ "$4" == "log" ] && log_enabled=$4
 	# Use ncat to listen to connection and let it call this script back in worker mode.
 	log Start listening at $ip:$port with worker at $SCRIPT_FULLPATH
-	ncat -k -l $ip $port -e "$SCRIPT_FULLPATH worker"
+	ncat -k -l $ip $port -e "$SCRIPT_FULLPATH worker $log_enabled"
 	ret=$?
 	log Server terminated with code $ret
-	return $ret
+	exit $ret
 elif [ "$1" == "worker" ]; then
 	# Worker mode.
+	[ "$2" == "log" ] && log_enabled=$2
 	shopt -s nocasematch
 	line1=""
 	line2=""

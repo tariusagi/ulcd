@@ -65,7 +65,7 @@ Supported commands are:
 - `line2` text: Show the text on the LCD's second line.
 - `display`: display line 1 and line 2 on the LCD.
 
-The server's log is at `/var/log/lcdserver.log`.
+To enable logging, add "log" at the end of command. The server's log is at `/var/log/lcdserver.log`.
 
 To run this server at boot, use `/etc/rc.local` or create a service file `/etc/systemd/system/lcd.service` like this (assumming path to this server is at `/usr/local/bin/lcdserver`):
 ```systemd
@@ -76,7 +76,7 @@ After=network.service
 [Service]
 User=root
 WorkingDirectory=/home/pi/
-ExecStart=/usr/local/bin/lcdserver server 0.0.0.0 1234
+ExecStart=/usr/local/bin/lcdserver server 0.0.0.0 1234 log
 Restart=on-failure
 RestartSec=5
 
