@@ -71,17 +71,17 @@ elif [ "$1" == "worker" ]; then
 		case $cmd in
 			clear)
 				log Clear screen
-				lcd -c
+				lcd -c > /dev/null
 				;;
 			line1)
 				text=${line#$cmd }
 				log Line 1 = \"$text\"
-				lcd -1 "$text"
+				lcd -1 "$text" > /dev/null
 				;;
 			line2)
 				text=${line#$cmd }
 				log Line 2 = \"$text\"
-				lcd -2 "$text"
+				lcd -2 "$text" > /dev/null
 				;;
 			*)
 				log $line

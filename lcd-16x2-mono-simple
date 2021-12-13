@@ -112,17 +112,13 @@ def main():
 		except KeyboardInterrupt:
 			pass
 		finally:
-			lcd_display(0x01, LCD_CMD)
-			GPIO.cleanup()
 			print "End of demo."
-	else:
-		GPIO.cleanup()
+			lcd_clear()
+	GPIO.cleanup()
 			
 def lcd_init():
 	lcd_display(0x28,LCD_CMD) # Selecting 4 - bit mode with two rows
 	lcd_display(0x0C,LCD_CMD) # Display On,Cursor Off, Blink Off
-	#  lcd_display(0x01,LCD_CMD) # Clear display
-
 	sleep(E_DELAY)
  
 def lcd_clear():
