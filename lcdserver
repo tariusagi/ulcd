@@ -54,6 +54,8 @@ if [ "$1" == "server" ]; then
 	# Prepare the directories.
 	test -d ~/run || mkdir ~/run
 	test -n "$log" && { test -d ~/log || mkdir ~/log; }
+	# Clear the LCD fist.
+	lcd -c > /dev/null
 	# Use ncat to listen to network connections and let it call this script back 
 	# in worker mode.
 	log Start listening at $ip:$port with worker at $SCRIPT_FULLPATH
