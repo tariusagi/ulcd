@@ -1,13 +1,6 @@
 #!/bin/bash
-log() {
-	test -n "$log_enabled" && echo $(date) $$: $* >> /var/log/lcdserver.log
-}
-
-# This script must be run as root/sudo.
-if [ $(id -u) -ne 0 ]; then
-	>&2 echo ERROR: must run as root/sudo.
-	exit 1
-fi
+# This is a daemon server to serve LCD display requests. It utilize ncat program 
+# to listen to requests and update the LCD display accordingly.
 
 # This script's full path name.
 SCRIPT_FULLPATH=$(readlink -f $0)
@@ -15,17 +8,30 @@ SCRIPT_FULLPATH=$(readlink -f $0)
 SCRIPT_DIR="$(dirname $SCRIPT_FULLPATH)"
 # This script's base name (file name only, without directory).
 SCRIPT_NAME=$(basename $SCRIPT_FULLPATH)
+# The log file.
+LOG=~/log/$SCRIPT_NAME.log
+# The mutex lock.
+LOCK=~/run/$SCRIPT_NAME.lock
+
+log() {
+	if [ -n "$log" ]; then
+		echo $(date +"%Y-%m-%d %H:%M:%S") $$: $* | tee -a $LOG
+	else
+		echo $(date +"%Y-%m-%d %H:%M:%S") $$: $*
+	fi
+}
 
 if [ $# -lt 1 ]; then
-	>&2 echo ERROR: missing argument.
-	>&2 echo Use \"server ip port\" to run in server mode.
-	>&2 echo Use \"worker\" to run as a worker.
-	>&2 echo Add \"log\" at the end of server mode to enable logging.
-	exit 1
+	cat <<-ENDOFUSAGE
+	A daemon server to serve LCD display requests.
+	Syntax: $SCRIPT_NAME server <ip> <port> [log]
+	Log file is $LOG if log is enabled.
+	ENDOFUSAGE
+	exit
 fi
 
 # Check dependencies.
-DEP="ncat"
+DEP=ncat
 
 # Check dependencies first.
 for d in $DEP; do
@@ -44,27 +50,29 @@ if [ "$1" == "server" ]; then
 	fi
 	ip=$2
 	port=$3
-	[ "$4" == "log" ] && log_enabled=$4
-	# Use ncat to listen to connection and let it call this script back in worker mode.
+	[ "$4" == "log" ] && log=$4
+	# Prepare the directories.
+	test -d ~/run || mkdir ~/run
+	test -n "$log" && { test -d ~/log || mkdir ~/log; }
+	# Use ncat to listen to network connections and let it call this script back 
+	# in worker mode.
 	log Start listening at $ip:$port with worker at $SCRIPT_FULLPATH
-	ncat -k -l $ip $port -e "$SCRIPT_FULLPATH worker $log_enabled"
+	ncat -k -l $ip $port -e "$SCRIPT_FULLPATH worker $log"
 	ret=$?
 	log Server terminated with code $ret
 	exit $ret
 elif [ "$1" == "worker" ]; then
 	# Worker mode.
-	[ "$2" == "log" ] && log_enabled=$2
+	set -e
+	[ "$2" == "log" ] && log=$2
 	shopt -s nocasematch
 	line1=""
 	line2=""
-	# Create a mutex lock to avoid messing the LCD by simultaneous workers.
-	lock="/var/run/$SCRIPT_NAME"
-	exec 9>$lock
-	log Acquiring lock
-	flock 9
+	# Use flock to create a mutext to avoid messing LCD updates.
+	exec {fd}>$LOCK
+	log Acquiring LOCK
+	flock $fd
 	log Lock acquired
-	# Write the current PID to lock file.
-	echo $$ 1>&9
 	# Read and process stdin line by line.
 	while IFS= read -r line; do
 		cmd=${line%% *}
