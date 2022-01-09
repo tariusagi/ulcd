@@ -31,7 +31,7 @@ if [ $# -lt 1 ]; then
 fi
 
 # Check dependencies.
-DEP=ncat
+DEP=ncat lcd
 
 # Check dependencies first.
 for d in $DEP; do
