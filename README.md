@@ -122,7 +122,7 @@ Supported commands are:
 
 To enable logging, add "log" at the end of command. The server's log is at `/var/log/lcdserver.log`.
 
-To run this server at boot, use `/etc/rc.local` or create a service file `/etc/systemd/system/lcd.service` like this (assumming path to this server is at `/usr/local/bin/lcdserver`):
+To run this server at boot, use `/etc/rc.local` or create a service file `/etc/systemd/system/lcdserver.service` like this (assumming path to this server is at `/usr/local/bin/lcdserver`):
 
 ```systemd
 [Unit]
@@ -146,8 +146,8 @@ Then run:
 
 ```sh
 sudo systemctl daemon-reload
-sudo systemctl enable lcd
-sudo systemctl start lcd
+sudo systemctl enable lcdserver
+sudo systemctl start lcdserver
 ```
 
 To start the server as a service.
