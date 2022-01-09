@@ -8,7 +8,7 @@ from time import sleep
 VERSION = "0.2"
 PROGRAM = os.path.basename(__file__)
 USAGE = """%s version %s.
-Display text onto an 16x2 monochrome LCD screen.
+Display text onto an 16x2 monochrome LCD screen with HD44780 controller.
 Syntax: %s [OPTION] [LINE1] [LINE2]
 OPTION:
 -h			Display this help and exit.
@@ -35,9 +35,9 @@ LCD_LINE_1 = 0x80 # LCD RAM address for the 1st line
 LCD_LINE_2 = 0xC0 # LCD RAM address for the 2nd line
  
 # Timing constants
-E_PULSE = 0.0005
-E_DELAY = 0.0005
- 
+#  E_PULSE = 0.0005
+#  E_DELAY = 0.0005
+
 def main():
 	clear = False
 	line1 = None
@@ -114,12 +114,11 @@ def main():
 		finally:
 			print "End of demo."
 			lcd_clear()
-	GPIO.cleanup()
 			
 def lcd_init():
-	lcd_display(0x28,LCD_CMD) # Selecting 4 - bit mode with two rows
-	lcd_display(0x0C,LCD_CMD) # Display On,Cursor Off, Blink Off
-	sleep(E_DELAY)
+	lcd_display(0x28,LCD_CMD) # Set 4 bits, 2 lines, default font.
+	lcd_display(0x0F,LCD_CMD) # Display, cursor and blinking all on.
+	#  sleep(E_DELAY)
  
 def lcd_clear():
 	lcd_display(0x01,LCD_CMD) # Clear display
@@ -168,11 +167,11 @@ def lcd_display(bits, mode):
  
 def lcd_toggle_enable():
 	# Toggle enable
-	sleep(E_DELAY)
+	#  sleep(E_DELAY)
 	GPIO.output(LCD_E, True)
-	sleep(E_PULSE)
+	#  sleep(E_PULSE)
 	GPIO.output(LCD_E, False)
-	sleep(E_DELAY)
+	#  sleep(E_DELAY)
  
 def lcd_string(message,line):
 	# Send string to display
@@ -186,3 +185,4 @@ def lcd_string(message,line):
  
 if __name__ == '__main__':
 	main()
+
