@@ -86,13 +86,13 @@ def main():
 
 	# Execute commands.
 	if clear:
-		print("Clear the LCD.")
+		print("Clear")
 		lcd_clear()
 	if line1 is not None:
-		print(f"Line 1: {line1}")
+		print(f"L1: {line1}")
 		lcd_string(line1,LCD_LINE_1)
 	if line2 is not None:
-		print(f"Line 2: {line2}")
+		print(f"L2: {line2}")
 		lcd_string(line2,LCD_LINE_2)
 	if demo:
 		print("Running a demo. Ctrl-C to stop...")
