@@ -6,7 +6,7 @@ Display messages and media on various LCD screens via GPIO.
 
 Display text onto a 16x2 monochrome LCD screen. Based on this [Interfacing 16x2 LCD with Raspberry Pi](https://www.electronicshub.org/interfacing-16x2-lcd-with-raspberry-pi/). Tested on a Raspberry Pi Zero W.
 
-This is a Python 2 program. It requires the `RPi.GPIO` package. Install it with `pip install rpi.gpio`.
+This is a Python 3 program. It requires the `RPi.GPIO` package. Install it with `pip install rpi.gpio`.
 
 For the Raspbery Pi pinout, visit https://pinout.xyz/.
 

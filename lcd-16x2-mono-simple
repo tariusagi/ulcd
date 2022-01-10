@@ -1,22 +1,23 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import os
 import sys
 import getopt
 import RPi.GPIO as GPIO
 from time import sleep
 
-VERSION = "0.2"
+VERSION = "0.3"
 PROGRAM = os.path.basename(__file__)
-USAGE = """%s version %s.
+USAGE = f"""\
+{PROGRAM} version {VERSION}.
 Display text onto an 16x2 monochrome LCD screen with HD44780 controller.
-Syntax: %s [OPTION] [LINE1] [LINE2]
+Syntax: {PROGRAM} [OPTION] [LINE1] [LINE2]
 OPTION:
 -h			Display this help and exit.
 -c			Clear the LCD.
 -d			Run a demo.
 -1 text Text to display on line 1.
 -2 text Text to display on line 2.
-""" % (PROGRAM, VERSION, PROGRAM)
+"""
 
 # Define GPIO to LCD mapping
 LCD_D4 = 15
@@ -51,7 +52,7 @@ def main():
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], 'h1:2:cd')
 	except getopt.error as err:
-		print >> sys.stderr, 'ERROR: %s. Use "-h" for usage.' % str(err)
+		print(f'ERROR: {str(err)}. Use "-h" for usage.', file = sys.stderr)
 		sys.exit(1)
 
 	for o, v in opts:
@@ -67,7 +68,7 @@ def main():
 		elif o == '-d':
 			demo = True
 		else:
-			print >> sys.stderr, 'ERROR: Unrecognized option. Use "-h" for usage.'
+			print('ERROR: Unrecognized option. Use "-h" for usage.', file = sys.stderr);
 			sys.exit(2)
 
 	# Assign registers.
@@ -85,16 +86,16 @@ def main():
 
 	# Execute commands.
 	if clear:
-		print "Clear the LCD."
+		print("Clear the LCD.")
 		lcd_clear()
 	if line1 is not None:
-		print "Line 1:", line1
+		print(f"Line 1: {line1}")
 		lcd_string(line1,LCD_LINE_1)
 	if line2 is not None:
-		print "Line 2:", line2
+		print(f"Line 2: {line2}")
 		lcd_string(line2,LCD_LINE_2)
 	if demo:
-		print "Running a demo. Ctrl-C to stop..."
+		print("Running a demo. Ctrl-C to stop...")
 		try:
 			while True:
 				# Send some test
@@ -112,7 +113,7 @@ def main():
 		except KeyboardInterrupt:
 			pass
 		finally:
-			print "End of demo."
+			print("End of demo.")
 			lcd_clear()
 			
 def lcd_init():
