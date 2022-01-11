@@ -152,3 +152,25 @@ sudo systemctl start lcdserver
 
 To start the server as a service.
 
+## lcd-128x64-ST7290
+
+Control the 128x64 LCD with ST7290 driver. Bases on [RPi-12864-LCD-ST7920-lib](https://github.com/SrBrahma/RPi-12864-LCD-ST7920-lib).
+
+### Pins connections
+
+Folows this scheme (using physical pin numbering on Raspberry Pi GPIO):
+
+```python
+# 1  GND -> Ground
+# 2  VCC -> +5V
+# 3  VO  -> +5V with 10K potentionmeter to adjust contrast
+# 4  RS  -> GPIO8 (SPI0 CE0)
+# 5  R/W -> GPIO10 (SPI0 MOSI)
+# 6  E   -> GPIO11 (SPI0 SCLK)
+# 7  PSB -> Ground (set SPI mode)
+# 8  RST -> GPIO25
+# 9  A   -> +5V 60mA for backlight anode
+# 10 K   -> Ground for backlight kathode
+
+```
+
