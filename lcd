@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+import os
+import sys
+import getopt
+from time import sleep
+
+VERSION = "0.1"
+PROGRAM = os.path.basename(__file__)
+USAGE = f"""\
+{PROGRAM} version {VERSION}.
+Display text or graphic to an attached LCD.
+Syntax: {PROGRAM} [OPTION] [TEXT]
+OPTION:
+-h      Display this help and exit.
+-t      LCD type. Supported type are hd44780, st7920. This is required.
+-i      Initialize/reset LCD.
+-x      Clear the LCD.
+-d      Run a demo (if supported).
+-l n    Move text cursor to line n (start from 1, default 1).
+-c n    Move text cursor to column n (if supported, start from 1, default 1).
+-p      Print LCD parameters.
+-w      Enable text wrap (default disable).
+"""
+
+def main():
+	lcdType = None
+	init = False
+	backlight = True
+	clear = False
+	demo = False
+	printParams = False
+	line = 1
+	col = 1
+	wrap = False
+	lcd = None
+	# Process command line arguments.
+	if len(sys.argv) == 1:
+		print(USAGE)
+		sys.exit(0)
+	# Handle commandline arguments.
+	try:
+		opts, args = getopt.getopt(sys.argv[1:], 'b:c:dil:pt:wx')
+	except getopt.error as err:
+		print(f'ERROR: {str(err)}. Use "-h" for usage.', file = sys.stderr)
+		sys.exit(1)
+
+	for o, v in opts:
+		if o == '-h':
+			print(USAGE)
+			sys.exit(0)
+		elif o == '-t':
+			lcdType = v
+		elif o == '-b':
+			if v == "on":
+				backlight = True
+			elif v == "off":
+				backlight = False
+		elif o == '-i':
+			init = True
+		elif o == '-x':
+			clear = True
+		elif o == '-d':
+			demo = True
+		elif o == '-p':
+			printParams = True
+		elif o == '-l':
+			line = int(v)
+		elif o == '-c':
+			col = int(v)
+		elif o == '-w':
+			wrap = True
+		else:
+			print('ERROR: Unknown option. Use "-h" for usage.', file = sys.stderr);
+			sys.exit(2)
+
+	text = ' '.join(args)
+
+	if lcdType == "st7920":
+		from st7920 import ST792012864SPI
+		lcd = ST792012864SPI(backLight = True)
+	if lcd is not None:
+		if printParams:
+			lcd.printParams()
+		if demo:
+			lcd.demo()
+			sys.exit(0)
+		if init:
+			lcd.init()
+		if backlight:
+			lcd.backLight = True
+		else:
+			lcd.backLight = False
+		if clear:
+			lcd.clear()
+		if len(text):
+			lcd.print(text, row = line, col = col)
+ 
+if __name__ == '__main__':
+	main()
+

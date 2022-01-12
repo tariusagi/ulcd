@@ -152,7 +152,7 @@ sudo systemctl start lcdserver
 
 To start the server as a service.
 
-## lcd-128x64-ST7290
+## lcd-128x64-ST7920
 
 Control the 128x64 LCD with ST7290 driver. Bases on [RPi-12864-LCD-ST7920-lib](https://github.com/SrBrahma/RPi-12864-LCD-ST7920-lib).
 

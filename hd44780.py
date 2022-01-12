@@ -10,7 +10,7 @@ PROGRAM = os.path.basename(__file__)
 USAGE = f"""\
 {PROGRAM} version {VERSION}.
 Display text onto an 16x2 monochrome LCD screen with HD44780 controller.
-Syntax: {PROGRAM} [OPTION] [LINE1] [LINE2]
+Syntax: {PROGRAM} [OPTION]
 OPTION:
 -h			Display this help and exit.
 -c			Clear the LCD.
