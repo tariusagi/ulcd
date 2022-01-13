@@ -128,6 +128,10 @@ BLK - Ground for backlight kathode
 
 If you don't want to control the backlight, just connect the BLA pin to +5V, which let the backlight on all the time, or leave both BLA and BLK out to disable the backlight.
 
+## st7920-demo
+
+A Python 3 program to demonstrate the 128x64 ST7920 LCD. Running without argument to display a simple test or "all" to perform a full demonstration with texts, custom fonts and graphics.
+
 ## hd44780.py
 *This module is a work in progress, not ready to use yet*
 
