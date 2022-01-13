@@ -362,8 +362,8 @@ def main():
 		printStringTextMode("Interface: SPI",0,2)
 		printStringTextMode("Code: Python 3",0,3)
 		sys.exit(0)
-	elif sys.argv[1] != "demo":
-		print("ERROR: Unknown option. Use \"demo\" for a full demonstration.",
+	elif sys.argv[1] != "all":
+		print("ERROR: Unknown option. Use \"all\" for a full demonstration.",
 				file = sys.stderr);
 		sys.exit(1)
 

@@ -13,6 +13,14 @@ LOG=~/log/$SCRIPT_NAME.log
 # The mutex lock.
 LOCK=~/run/$SCRIPT_NAME.lock
 
+print_usage() {
+	cat <<-ENDOFUSAGE
+	A daemon server to serve LCD display requests.
+	Syntax: $SCRIPT_NAME server <ip> <port> [log]
+	Log file is $LOG if log is enabled.
+	ENDOFUSAGE
+}
+
 log() {
 	if [ -n "$log" ]; then
 		echo $(date +"%Y-%m-%d %H:%M:%S") $$: $* | tee -a $LOG
@@ -22,11 +30,7 @@ log() {
 }
 
 if [ $# -lt 1 ]; then
-	cat <<-ENDOFUSAGE
-	A daemon server to serve LCD display requests.
-	Syntax: $SCRIPT_NAME server <ip> <port> [log]
-	Log file is $LOG if log is enabled.
-	ENDOFUSAGE
+	print_usage
 	exit
 fi
 
@@ -54,8 +58,8 @@ if [ "$1" == "server" ]; then
 	# Prepare the directories.
 	test -d ~/run || mkdir ~/run
 	test -n "$log" && { test -d ~/log || mkdir ~/log; }
-	# Clear the LCD fist.
-	lcd -t st7920 -i -x -b on LCDSERVER... > /dev/null
+	# Initialize the LCD.
+	lcd -t st7920 -i -B "LCDSERVER..." > /dev/null
 	# Use ncat to listen to network connections and let it call this script back 
 	# in worker mode.
 	log Start listening at $ip:$port with worker at $SCRIPT_FULLPATH
@@ -81,27 +85,27 @@ elif [ "$1" == "worker" ]; then
 		case $cmd in
 			clear)
 				log Clear screen
-				lcd -t st7920 -i -x > /dev/null
+				lcd -t st7920 -x > /dev/null
 				;;
 			line1)
 				text=${line#$cmd }
 				log Line 1 = \"$text\"
-				lcd -t st7920 -l1 -c1 "$text"
+				lcd -t st7920 -l1 "$text"
 				;;
 			line2)
 				text=${line#$cmd }
 				log Line 2 = \"$text\"
-				lcd -t st7920 -l2 -c1 "$text"
+				lcd -t st7920 -l2 "$text"
 				;;
 			line3)
 				text=${line#$cmd }
 				log Line 3 = \"$text\"
-				lcd -t st7920 -l3 -c1 "$text"
+				lcd -t st7920 -l3 "$text"
 				;;
 			line4)
 				text=${line#$cmd }
 				log Line 4 = \"$text\"
-				lcd -t st7920 -l4 -c1 "$text"
+				lcd -t st7920 -l4 "$text"
 				;;
 			*)
 				log $line
@@ -109,5 +113,7 @@ elif [ "$1" == "worker" ]; then
 		esac
 	done
 	log EOF
+else
+	>&2 echo ERROR: No action defined.
 fi
 

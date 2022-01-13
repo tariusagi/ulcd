@@ -1,112 +1,36 @@
 # Uzi's LCD library
 
-Display messages and media on various LCD screens via GPIO.
+Most of the programs and modules work with Raspberry Pi boards, which requires the `RPi.GPIO` package. Install it with `pip install rpi.gpio`.
 
-## lcd-16x2-mono-simple
+Visit https://pinout.xyz/, or run `gpio readall` to view the Raspberry GPIO pinout.
 
-Display text onto a 16x2 monochrome LCD screen. Based on this [Interfacing 16x2 LCD with Raspberry Pi](https://www.electronicshub.org/interfacing-16x2-lcd-with-raspberry-pi/). Tested on a Raspberry Pi Zero W.
+## lcd
 
-This is a Python 3 program. It requires the `RPi.GPIO` package. Install it with `pip install rpi.gpio`.
-
-For the Raspbery Pi pinout, visit https://pinout.xyz/, or run `gpio readall` to get that pinout, like mine below:
-
-```txt
- +-----+-----+---------+------+---+-Pi ZeroW-+---+------+---------+-----+-----+
- | BCM | wPi |   Name  | Mode | V | Physical | V | Mode | Name    | wPi | BCM |
- +-----+-----+---------+------+---+----++----+---+------+---------+-----+-----+
- |     |     |    3.3v |      |   |  1 || 2  |   |      | 5v      |     |     |
- |   2 |   8 |   SDA.1 |   IN | 1 |  3 || 4  |   |      | 5v      |     |     |
- |   3 |   9 |   SCL.1 |   IN | 1 |  5 || 6  |   |      | 0v      |     |     |
- |   4 |   7 | GPIO. 7 |   IN | 1 |  7 || 8  | 0 | IN   | TxD     | 15  | 14  |
- |     |     |      0v |      |   |  9 || 10 | 1 | IN   | RxD     | 16  | 15  |
- |  17 |   0 | GPIO. 0 |   IN | 0 | 11 || 12 | 0 | IN   | GPIO. 1 | 1   | 18  |
- |  27 |   2 | GPIO. 2 |   IN | 0 | 13 || 14 |   |      | 0v      |     |     |
- |  22 |   3 | GPIO. 3 |   IN | 0 | 15 || 16 | 0 | IN   | GPIO. 4 | 4   | 23  |
- |     |     |    3.3v |      |   | 17 || 18 | 1 | OUT  | GPIO. 5 | 5   | 24  |
- |  10 |  12 |    MOSI |  OUT | 0 | 19 || 20 |   |      | 0v      |     |     |
- |   9 |  13 |    MISO | ALT0 | 0 | 21 || 22 | 1 | OUT  | GPIO. 6 | 6   | 25  |
- |  11 |  14 |    SCLK |  OUT | 0 | 23 || 24 | 1 | OUT  | CE0     | 10  | 8   |
- |     |     |      0v |      |   | 25 || 26 | 1 | OUT  | CE1     | 11  | 7   |
- |   0 |  30 |   SDA.0 |   IN | 1 | 27 || 28 | 1 | IN   | SCL.0   | 31  | 1   |
- |   5 |  21 | GPIO.21 |   IN | 1 | 29 || 30 |   |      | 0v      |     |     |
- |   6 |  22 | GPIO.22 |   IN | 1 | 31 || 32 | 0 | IN   | GPIO.26 | 26  | 12  |
- |  13 |  23 | GPIO.23 |   IN | 0 | 33 || 34 |   |      | 0v      |     |     |
- |  19 |  24 | GPIO.24 |   IN | 0 | 35 || 36 | 0 | IN   | GPIO.27 | 27  | 16  |
- |  26 |  25 | GPIO.25 |   IN | 0 | 37 || 38 | 0 | IN   | GPIO.28 | 28  | 20  |
- |     |     |      0v |      |   | 39 || 40 | 0 | IN   | GPIO.29 | 29  | 21  |
- +-----+-----+---------+------+---+----++----+---+------+---------+-----+-----+
- | BCM | wPi |   Name  | Mode | V | Physical | V | Mode | Name    | wPi | BCM |
- +-----+-----+---------+------+---+-Pi ZeroW-+---+------+---------+-----+-----+
-```
-
-### Power supply
-
-Connect GPIO pin 4 (+5V) to the LCD's VDD pin and GPIO pin 6 (GND) to the LCD's VSS pin.
-
-### Pins connections
-
-Folows this scheme (using physical pin numbering on Raspberry Pi GPIO):
-
-```python
-LCD_D4 = 15
-LCD_D5 = 16
-LCD_D6 = 18
-LCD_D7 = 22
-LCD_E  = 11
-LCD_RS = 13
-```
-
-### Contrast adjustment
-
-Althought optional, a 10kΩ potentionmeter might be needed to adjust the contrast of the LCD (in Hanoi, get the 3362P square potentionmeter in any shop). Connect pin 1 of the potentionmeter to the +5V power supply, pin 3 to the ground, and pin 2 to the V0 (contrast) pin of the LCD.
-
-### Usage
-
-```sh
-Syntax: lcd-16x2-mono-simple [OPTION] [LINE1] [LINE2]
-OPTION:
--h                      Display this help and exit.
--c                      Clear the LCD.
--d                      Run a demo.
--1 text Text to display on line 1.
--2 text Text to display on line 2.
-```
-
-## lcd-16x2-mono
-
-Display text onto a 16x2 monochrome LCD screen. Based on this [Drive a 16x2 LCD with the Raspberry Pi](https://learn.adafruit.com/drive-a-16x2-lcd-directly-with-a-raspberry-pi/overview). Tested on a Raspberry Pi Zero W.
-
-Use the same wiring scheme as `lcd-16x2-mono-simple` above.
-
-This program requires Python 3 and `adafruit-circuitpython-charlcd` package. Install it with `pip3 install adafruit-circuitpython-charlcd`.
+This Python 3 program controll various LCDs using code from the various modules in this project. 
 
 Usage:
 
-```
-Syntax: lcd-16x2-mono [OPTION] [LINE1] [LINE2]
+```txt
+Syntax: lcd [OPTION] [TEXT]
 OPTION:
+-B      Turn backlight on.
+-b      Turn backlight off.
+-d      Run a demo (if supported). This ignore all other options.
 -h      Display this help and exit.
--c      Clear the LCD.
--1 path File to read first line, imply daemon mode.
--2 path File to read second line, imply daemon mode.
--i n    Set scrolling interval (float). Default is 0.5 (second).
--t n    Terminate after n seconds. Otherwise run indefinitely.
--v      Run verbose.
-LINE1   A text to display in line 1. This override -1 and -2 options.
-LINE2   A text to display in line 2. This override -1 and -2 options.
-In daemon mode, this program keep reading file(s) as specified in -1 and -2 
-options to get new textx and update the display accordingly. Also in this mode,
-if a text line is longer than the display, it will be scroll back and forth
-indefinitely or until time out (as specified by -t option).  
-Daemon can be used only with -1 and/or -2 option(s).  If -1 and -2 option are
-not used, then this program will just display TEXT and then terminate.
+-i      Initialize/reset LCD (effectively clear the screen).
+-p      Print LCD parameters.
+-t      LCD type. Supported type are hd44780, st7920. This is required.
+-x      Clear the LCD screen.
+-r      Restore GPIO settings (default is not).
+-l n    Move text cursor to line n (start from 1, default 1).
+-c n    Move text cursor to column n (if supported, start from 1, default 1).
 ```
 
 ## lcdserver
 
-Run a network server and serve requests from clients to control the attached LCD. Requires root priviledge.
+A Bash script to run a network server and serve requests from clients to control the attached LCD. Requires root priviledge.
 
-This program need `ncat`, and `lcd-16x2-mono-simple` symlinked or renamed as `lcd` on system PATH.
+This program need `ncat`, and this project's `lcd` program on PATH.
 
 Usage:
 
@@ -181,25 +105,48 @@ sudo systemctl start lcdserver
 
 To start the server as a service.
 
-## lcd-128x64-ST7920
+## st7920.py
 
-Control the 128x64 LCD with ST7290 driver. Bases on [RPi-12864-LCD-ST7920-lib](https://github.com/SrBrahma/RPi-12864-LCD-ST7920-lib).
+A Python 3 module to control the 128x64 LCD with ST7290 driver. Bases on [RPi-12864-LCD-ST7920-lib](https://github.com/SrBrahma/RPi-12864-LCD-ST7920-lib).
 
-### Pins connections
+Wiring scheme (BCM pin naming):
 
-Folows this scheme (using physical pin numbering on Raspberry Pi GPIO):
+```txt
+LCD   GPIO
+---   ----
+GND - Ground
+VCC - +5V
+VO  - +5V with 10K potentionmeter to adjust contrast
+RS  - +5V
+R/W - 10 (SPI0 MOSI)
+E   - 11 (SPI0 SCLK)
+PSB - Ground (set SPI mode)
+RST - 25
+BLA - 24 60mA for backlight anode
+BLK - Ground for backlight kathode
+```
 
-```python
-# 1  GND -> Ground
-# 2  VCC -> +5V
-# 3  VO  -> +5V with 10K potentionmeter to adjust contrast
-# 4  RS  -> GPIO8 (SPI0 CE0)
-# 5  R/W -> GPIO10 (SPI0 MOSI)
-# 6  E   -> GPIO11 (SPI0 SCLK)
-# 7  PSB -> Ground (set SPI mode)
-# 8  RST -> GPIO25
-# 9  A   -> +5V 60mA for backlight anode
-# 10 K   -> Ground for backlight kathode
+If you don't want to control the backlight, just connect the BLA pin to +5V, which let the backlight on all the time, or leave both BLA and BLK out to disable the backlight.
 
+## hd44780.py
+*This module is a work in progress, not ready to use yet*
+
+A Python 3 module to control a 16x2 monochrome LCD screen. Based on this [Interfacing 16x2 LCD with Raspberry Pi](https://www.electronicshub.org/interfacing-16x2-lcd-with-raspberry-pi/). Tested on a Raspberry Pi Zero W.
+
+Connect LCD's VDD and VSS pins to +5V and ground to power the LCD.
+
+A 10kΩ potentionmeter MUST BE NEEDED to adjust the contrast of the LCD, such as the 3362P square potentionmeter. Connect pin 1 of the potentionmeter to the +5V power supply, pin 3 to the ground, and pin 2 to the V0 (contrast) pin of the LCD. Then adjust the potentionmeter until the contrast is right.
+
+Wiring scheme (using Raspberry Pi's physical pin number):
+
+```txt
+LCD   GPIO
+---   ----
+D4  - 15
+D5  - 16
+D6  - 18
+D7  - 22
+E   - 11
+RS  - 13
 ```
 
