@@ -122,11 +122,11 @@ R/W - 10 (SPI0 MOSI)
 E   - 11 (SPI0 SCLK)
 PSB - Ground (set SPI mode)
 RST - 25
-BLA - 24 60mA for backlight anode
+BLA - 24
 BLK - Ground for backlight kathode
 ```
 
-If you don't want to control the backlight, just connect the BLA pin to +5V, which let the backlight on all the time, or leave both BLA and BLK out to disable the backlight.
+If you don't want to control the backlight, just connect the BLA pin to a +5V 60mA, which let the backlight on all the time, or leave both BLA and BLK out to disable the backlight.
 
 ## st7920-demo
 
