@@ -35,7 +35,7 @@ This program need `ncat`, and this project's `lcd` program on PATH.
 Usage:
 
 ```txt
-Syntax: lcdserver -h -w -l file <-t type> <ip> <port>
+Syntax: lcdserver -h -l file <-t type> <ip> <port>
 where:
 -h      Print this usage.
 -l      Log to the given file.

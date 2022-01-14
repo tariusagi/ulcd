@@ -16,7 +16,7 @@ LOCK=~/run/$SCRIPT_NAME.lock
 print_usage() {
 	cat <<-ENDOFUSAGE
 	A daemon server to serve LCD display requests.
-	Syntax: $SCRIPT_NAME -h -w -l file <-t type> <ip> <port>
+	Syntax: $SCRIPT_NAME -h -l file <-t type> <ip> <port>
 	where:
 	-h      Print this usage.
 	-l      Log to the given file.
