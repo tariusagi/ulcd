@@ -26,7 +26,7 @@ print_usage() {
 
 log() {
 	if [ -n "$log" ]; then
-		echo $(date +"%Y-%m-%d %H:%M:%S") $$: $* | tee -a $LOG
+		echo $(date +"%Y-%m-%d %H:%M:%S") $$: $* | tee -a $log
 	else
 		echo $(date +"%Y-%m-%d %H:%M:%S") $$: $*
 	fi
@@ -93,9 +93,9 @@ if [ -z "$worker" ]; then
 
 	# Prepare the directories.
 	test -d ~/run || mkdir ~/run
-	test -n "$log" && { test -d ~/log || mkdir ~/log; }
+	# test -n "$log" && { test -d ~/log || mkdir ~/log; }
 	# Initialize the LCD.
-	lcd -t $lcd_type -i -B "LCDSERVER..." > /dev/null
+	lcd -t $lcd_type -i -x -B "LCDSERVER..." > /dev/null
 	# Use ncat to listen to network connections and let it call this script back 
 	# in worker mode.
 	log Listening at $ip:$port, LCD $lcd_type, worker at $SCRIPT_FULLPATH
