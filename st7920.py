@@ -9,7 +9,7 @@ LCD_DATA = 1
 BLANK_LINE = "                "
 
 class ST792012864SPI(BaseLCD):
-	"""Handle LCD with Hitachi ST7290 chip in SPI mode.  The default pins are 
+	"""Handle LCD with Sitronix ST7290 chip in SPI mode.  The default pins are 
 	(in BCM numbering):
 		E   = 11
 		RW  = 10
