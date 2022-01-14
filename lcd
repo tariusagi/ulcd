@@ -81,6 +81,9 @@ def main():
 	if lcdType == "st7920":
 		from st7920 import ST792012864SPI
 		lcd = ST792012864SPI()
+	elif lcdType == "hd44780":
+		from hd44780 import HD44780
+		lcd = HD44780()
 	else:
 		print('ERROR: unsupported LCD.', file = sys.stderr)
 		sys.exit(3)
@@ -95,15 +98,13 @@ def main():
 			lcd.demo()
 			sys.exit(0)
 		if init:
-			lcd.init(setupGPIO = True)
-		else:
-			lcd.init(setupGPIO = False)
+			lcd.init()
 		if backLight is not None:
 			lcd.backLight = backLight
 		if clear:
 			lcd.clearScreen()
 		if len(text):
-			lcd.printText(text, row = line, col = col)
+			lcd.printText(text, line = line, col = col)
 		if cleanup:
 			lcd.cleanup()
  

@@ -4,186 +4,115 @@ import sys
 import getopt
 import RPi.GPIO as GPIO
 from time import sleep
+from baselcd import BaseLCD
 
-VERSION = "0.3"
-PROGRAM = os.path.basename(__file__)
-USAGE = f"""\
-{PROGRAM} version {VERSION}.
-Display text onto an 16x2 monochrome LCD screen with HD44780 controller.
-Syntax: {PROGRAM} [OPTION]
-OPTION:
--h			Display this help and exit.
--c			Clear the LCD.
--d			Run a demo.
--1 text Text to display on line 1.
--2 text Text to display on line 2.
-"""
+DATA_MODE = True
+CMD_MODE = False
+ 
+LINE_ADDR = [ 0x80, 0xC0 ]
 
-# Define GPIO to LCD mapping
-LCD_D4 = 15
-LCD_D5 = 16
-LCD_D6 = 18
-LCD_D7 = 22
-LCD_E  = 11
-LCD_RS = 13
- 
-# Define some device constants
-LCD_WIDTH = 16		# Maximum characters per line
-LCD_CHR = True
-LCD_CMD = False
- 
-LCD_LINE_1 = 0x80 # LCD RAM address for the 1st line
-LCD_LINE_2 = 0xC0 # LCD RAM address for the 2nd line
- 
-# Timing constants
 #  E_PULSE = 0.0005
 #  E_DELAY = 0.0005
 
-def main():
-	clear = False
-	line1 = None
-	line2 = None
-	demo = False
-	# Process command line arguments.
-	if len(sys.argv) == 1:
-		print(USAGE)
-		sys.exit(0)
-	# Handle commandline arguments.
-	try:
-		opts, args = getopt.getopt(sys.argv[1:], 'h1:2:cd')
-	except getopt.error as err:
-		print(f'ERROR: {str(err)}. Use "-h" for usage.', file = sys.stderr)
-		sys.exit(1)
+class HD44780(BaseLCD):
+	"""Handle LCD with Hitachi HD44780 chip in 4 bit parallel mode.  The default
+	pins are (in BCM numbering):
+  LCD   GPIO (BCM)
+  ---   ----------
+  VDD - +5V
+  VSS - Ground
+  V0  - Pin 3 (possitive) of a 10kΩ potentionmeter 
+  RS  - 25
+  RW  - Ground (to write data)
+  E   - 24
+  D4  - 23
+  D5  - 17
+  D6  - 18
+  D7  - 22
+	"""
 
-	for o, v in opts:
-		if o == '-h':
-			print(USAGE)
-			sys.exit(0)
-		elif o == '-1':
-			line1 = v
-		elif o == '-2':
-			line2 = v
-		elif o == '-c':
-			clear = True
-		elif o == '-d':
-			demo = True
-		else:
-			print('ERROR: Unrecognized option. Use "-h" for usage.', file = sys.stderr);
-			sys.exit(2)
+	def __init__(self, rs = 25, en = 24, d4 = 23, d5 = 17, d6 = 18, d7 = 22):
+		super().__init__(driver = "HD44780", 
+				en = en, rs = rs, d4 = d4, d5 = d5, d6 = d6, d7 = d7,
+				columns = 16, lines = 2)
+		GPIO.setwarnings(False)
+		GPIO.setmode(GPIO.BCM)
+		GPIO.setup(self.en, GPIO.OUT)
+		GPIO.setup(self.rs, GPIO.OUT)
+		GPIO.setup(self.d4, GPIO.OUT)
+		GPIO.setup(self.d5, GPIO.OUT)
+		GPIO.setup(self.d6, GPIO.OUT)
+		GPIO.setup(self.d7, GPIO.OUT)
 
-	# Assign registers.
-	GPIO.setwarnings(False)
-	GPIO.setmode(GPIO.BOARD)		 # Use physical pin numbers
-	GPIO.setup(LCD_E, GPIO.OUT)  # E
-	GPIO.setup(LCD_RS, GPIO.OUT) # RS
-	GPIO.setup(LCD_D4, GPIO.OUT) # DB4
-	GPIO.setup(LCD_D5, GPIO.OUT) # DB5
-	GPIO.setup(LCD_D6, GPIO.OUT) # DB6
-	GPIO.setup(LCD_D7, GPIO.OUT) # DB7
- 
-	# Initialise display
-	lcd_init()
+	def _toggleEn(self):
+		#  sleep(E_DELAY)
+		GPIO.output(self.en, True)
+		#  sleep(E_PULSE)
+		GPIO.output(self.en, False)
+		#  sleep(E_DELAY)
+	 
+	def _sendByte(self, byte, mode):
+		"""Send one byte to the LCD. mode True for character, False for command."""
+		GPIO.output(self.rs, mode)
+		# High bits.
+		GPIO.output(self.d4, False)
+		GPIO.output(self.d5, False)
+		GPIO.output(self.d6, False)
+		GPIO.output(self.d7, False)
+		if byte&0x10==0x10:
+			GPIO.output(self.d4, True)
+		if byte&0x20==0x20:
+			GPIO.output(self.d5, True)
+		if byte&0x40==0x40:
+			GPIO.output(self.d6, True)
+		if byte&0x80==0x80:
+			GPIO.output(self.d7, True)
+		self._toggleEn()
+		# Low bits.
+		GPIO.output(self.d4, False)
+		GPIO.output(self.d5, False)
+		GPIO.output(self.d6, False)
+		GPIO.output(self.d7, False)
+		if byte&0x01==0x01:
+			GPIO.output(self.d4, True)
+		if byte&0x02==0x02:
+			GPIO.output(self.d5, True)
+		if byte&0x04==0x04:
+			GPIO.output(self.d6, True)
+		if byte&0x08==0x08:
+			GPIO.output(self.d7, True)
+		self._toggleEn()
+	 
+	def init(self):
+		self._sendByte(0x28,CMD_MODE) # Set 4 bits, 2 lines, default font.
+		self._sendByte(0x0C,CMD_MODE) # Display, cursor and blinking all off.
+		#  sleep(E_DELAY)
+	 
+	def clearScreen(self):
+		self._sendByte(0x01,CMD_MODE) # Clear display
 
-	# Execute commands.
-	if clear:
-		print("Clear")
-		lcd_clear()
-	if line1 is not None:
-		print(f"L1: {line1}")
-		lcd_string(line1,LCD_LINE_1)
-	if line2 is not None:
-		print(f"L2: {line2}")
-		lcd_string(line2,LCD_LINE_2)
-	if demo:
-		print("Running a demo. Ctrl-C to stop...")
-		try:
-			while True:
-				# Send some test
-				lcd_string("Electronics Hub ",LCD_LINE_1)
-				lcd_string("		Presents		",LCD_LINE_2)
-				sleep(3) # 3 second delay
-				# Send some text
-				lcd_string("Rasbperry Pi",LCD_LINE_1)
-				lcd_string("16x2 LCD Test",LCD_LINE_2)
-				sleep(3) # 3 second delay
-				# Send some text
-				lcd_string("1234567890*@$#%&",LCD_LINE_1)
-				lcd_string("abcdefghijklmnop",LCD_LINE_2)
-				sleep(3)
-		except KeyboardInterrupt:
-			pass
-		finally:
-			print("End of demo.")
-			lcd_clear()
-			
-def lcd_init():
-	lcd_display(0x28,LCD_CMD) # Set 4 bits, 2 lines, default font.
-	lcd_display(0x0F,LCD_CMD) # Display, cursor and blinking all on.
-	#  sleep(E_DELAY)
- 
-def lcd_clear():
-	lcd_display(0x01,LCD_CMD) # Clear display
+	def printText(self, text, line = 1, col = 1):
+		# Avoid unused warning.
+		col = None
+		text = text.ljust(self.columns," ")
+		self._sendByte(LINE_ADDR[line - 1], CMD_MODE)
+		for i in range(self.columns):
+			self._sendByte(ord(text[i]),DATA_MODE)
 
-def lcd_display(bits, mode):
-	# Send byte to data pins
-	# bits = data
-	# mode = True  for character
-	#				 False for command
- 
-	GPIO.output(LCD_RS, mode) # RS
- 
-	# High bits
-	GPIO.output(LCD_D4, False)
-	GPIO.output(LCD_D5, False)
-	GPIO.output(LCD_D6, False)
-	GPIO.output(LCD_D7, False)
-	if bits&0x10==0x10:
-		GPIO.output(LCD_D4, True)
-	if bits&0x20==0x20:
-		GPIO.output(LCD_D5, True)
-	if bits&0x40==0x40:
-		GPIO.output(LCD_D6, True)
-	if bits&0x80==0x80:
-		GPIO.output(LCD_D7, True)
- 
-	# Toggle 'Enable' pin
-	lcd_toggle_enable()
- 
-	# Low bits
-	GPIO.output(LCD_D4, False)
-	GPIO.output(LCD_D5, False)
-	GPIO.output(LCD_D6, False)
-	GPIO.output(LCD_D7, False)
-	if bits&0x01==0x01:
-		GPIO.output(LCD_D4, True)
-	if bits&0x02==0x02:
-		GPIO.output(LCD_D5, True)
-	if bits&0x04==0x04:
-		GPIO.output(LCD_D6, True)
-	if bits&0x08==0x08:
-		GPIO.output(LCD_D7, True)
- 
-	# Toggle 'Enable' pin
-	lcd_toggle_enable()
- 
-def lcd_toggle_enable():
-	# Toggle enable
-	#  sleep(E_DELAY)
-	GPIO.output(LCD_E, True)
-	#  sleep(E_PULSE)
-	GPIO.output(LCD_E, False)
-	#  sleep(E_DELAY)
- 
-def lcd_string(message,line):
-	# Send string to display
- 
-	message = message.ljust(LCD_WIDTH," ")
- 
-	lcd_display(line, LCD_CMD)
- 
-	for i in range(LCD_WIDTH):
-		lcd_display(ord(message[i]),LCD_CHR)
- 
-if __name__ == '__main__':
-	main()
+	def demo(self):
+		print("Running a demo...")
+		self.clearScreen()
+		sleep(1)
+		self.printText("    HD44780", line = 1)
+		self.printText(" 16x2 LCD demo", line = 2)
+		sleep(3)
+		self.printText("1234567890*@$#%&", line = 1)
+		self.printText("abcdefghijklmnop", line = 2)
+		sleep(3)
+		self.printText("ABCDEFGHIJKLMNOP", line = 2)
+		sleep(3)
+		self.printText("Have a nice day!", line = 1)
+		self.printText("    The end", line = 2)
+		sleep(3)
+		print("End of demo.")
 

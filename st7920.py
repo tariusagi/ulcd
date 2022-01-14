@@ -104,14 +104,14 @@ class ST792012864SPI(BaseLCD):
 		self._setRw(0)
 		self._strobe4()
 
-	def _setCaret(self, row, col): 
-		"""Position text caret at the given row (1..4) and column (1..16)"""
+	def _setCaret(self, line, col): 
+		"""Position text caret at the given line (1..4) and column (1..16)"""
 		addr = 0x80
-		if row == 2: 
+		if line == 2: 
 			addr = 0x90
-		elif row == 3:
+		elif line == 3:
 			addr = 0x88
-		elif row == 4: 
+		elif line == 4: 
 			addr = 0x98
 		if self._hcgrom:
 			addr += (col - 1) // 2
@@ -130,18 +130,18 @@ class ST792012864SPI(BaseLCD):
 	def cleanup(self):
 		GPIO.cleanup()
 
-	def init(self, setupGPIO = True): 
-		if setupGPIO:
-			GPIO.output(self.rw, False)
-			GPIO.output(self.en, False)
-			GPIO.output(self.rst, False)
-			sleep(0.1)
-			GPIO.output(self.rst, True)
-			#
-			self._sendByte(LCD_CMD, 0b00110000)  # Function set (8 bit)
-			self._sendByte(LCD_CMD, 0b00110000)  # Function set (basic instruction set)
-			self._sendByte(LCD_CMD, 0b00001100)  # Display ON, cursor OFF, no blinking
-			self._sendByte(LCD_CMD, 0b10000000)  # Reset Address Counter
+	def init(self): 
+		GPIO.output(self.rw, False)
+		GPIO.output(self.en, False)
+		GPIO.output(self.rst, False)
+		sleep(0.1)
+		GPIO.output(self.rst, True)
+		#
+		self._sendByte(LCD_CMD, 0b00110000)  # Function set (8 bit)
+		self._sendByte(LCD_CMD, 0b00110000)  # Function set (basic instruction set)
+		self._sendByte(LCD_CMD, 0b00001100)  # Display ON, cursor OFF, no blinking
+		self._sendByte(LCD_CMD, 0b10000000)  # Reset Address Counter
+		#
 		self._textMode = True
 		self._hcgrom = True
 		self._textBuf = [ BLANK_LINE, BLANK_LINE, BLANK_LINE, BLANK_LINE ]
@@ -150,8 +150,8 @@ class ST792012864SPI(BaseLCD):
 		self._sendByte(LCD_CMD, 0b00000001)
 		self._textBuf = [ BLANK_LINE, BLANK_LINE, BLANK_LINE, BLANK_LINE ]
 
-	def printText(self, text, row = 1, col = 1, fillChar = ' '): 
-		"""Print a text at the given row (1..4) and column (1..16)"""
+	def printText(self, text, line = 1, col = 1, fillChar = ' '): 
+		"""Print a text at the given line (1..4) and column (1..16)"""
 		# Trim text longer than 16 characters.
 		if fillChar is not None:
 			if col > 1:
@@ -162,13 +162,13 @@ class ST792012864SPI(BaseLCD):
 		if (len(text) + col > 17):
 			text = text[0:16 - col]
 		# Merge into text buffer.
-		s = list(self._textBuf[row - 1])
+		s = list(self._textBuf[line - 1])
 		for i in range(len(text)):
 			if s[i + col - 1] != text[i]:
 				s[i + col - 1] = text[i]
-		self._textBuf[row - 1] = "".join(s)
+		self._textBuf[line - 1] = "".join(s)
 		# Now send to LCD.
-		self._setCaret(row, col)
+		self._setCaret(line, col)
 		if self._hcgrom:
 			l = len(text)
 			i = 0
@@ -177,7 +177,7 @@ class ST792012864SPI(BaseLCD):
 			while i < l:
 				# NOTE: 8x16 font require 2 character in a single address.
 				if i == 0 and col % 2 == 0:
-					hi = ord(self._textBuf[row - 1][col - 2])
+					hi = ord(self._textBuf[line - 1][col - 2])
 					lo = ord(text[0])
 					i = 1
 				else:
@@ -185,14 +185,14 @@ class ST792012864SPI(BaseLCD):
 					if i + 1 < l:
 						lo = ord(text[i + 1])
 					else:
-						lo = ord(self._textBuf[row - 1][col + i])
+						lo = ord(self._textBuf[line - 1][col + i])
 					i += 2
 				self._send2Bytes(LCD_DATA, hi, lo)
 
-	def clearTextLine(self, row):
-		self.printText('', row = row)
+	def clearTextLine(self, line):
+		self.printText('', line = line)
 		# Clear text buffer.
-		self._textBuf[row - 1] = BLANK_LINE
+		self._textBuf[line - 1] = BLANK_LINE
 
 	def demo(self):
 		try:
@@ -200,34 +200,34 @@ class ST792012864SPI(BaseLCD):
 			self.backLight = True
 
 			self.printText("ST7920 demo:")
-			self.printText("Hi, how are you?", row = 2)
+			self.printText("Hi, how are you?", line = 2)
 			sleep(1.0)
-			self.printText("Please wait...", row = 3)
+			self.printText("Please wait...", line = 3)
 			for i in range(16):
-				self.printText(">".rjust(i + 1, '='), row = 4)
+				self.printText(">".rjust(i + 1, '='), line = 4)
 				sleep(0.1)
-			self.printText("Numbers:", row = 1)
-			self.printText("0123456789-+=<>/", row = 2)
-			self.printText("~!@#$%^&*()_,.;?", row = 3)
-			self.printText("Next in  s", row = 4, col = 3)
+			self.printText("Numbers:", line = 1)
+			self.printText("0123456789-+=<>/", line = 2)
+			self.printText("~!@#$%^&*()_,.;?", line = 3)
+			self.printText("Next in  s", line = 4, col = 3)
 			for i in range(3, 0, -1):
-				self.printText(str(i), row = 4, col = 11, fillChar = None)
+				self.printText(str(i), line = 4, col = 11, fillChar = None)
 				sleep(1.0)
-			self.printText("Lower cases:", row = 1)
-			self.printText("abcdefghijklmnop", row = 2);
-			self.printText("qrstuvwxyz", row = 3)
+			self.printText("Lower cases:", line = 1)
+			self.printText("abcdefghijklmnop", line = 2);
+			self.printText("qrstuvwxyz", line = 3)
 			for i in range(3, 0, -1):
-				self.printText(str(i), row = 4, col = 11, fillChar = None)
+				self.printText(str(i), line = 4, col = 11, fillChar = None)
 				sleep(1.0)
-			self.printText("Upper cases:", row = 1)
-			self.printText("ABCDEFGHIJKLMNOP", row = 2);
-			self.printText("QRSTUVWXYZ", row = 3)
+			self.printText("Upper cases:", line = 1)
+			self.printText("ABCDEFGHIJKLMNOP", line = 2);
+			self.printText("QRSTUVWXYZ", line = 3)
 			for i in range(3, 0, -1):
-				self.printText(str(i), row = 4, col = 11, fillChar = None)
+				self.printText(str(i), line = 4, col = 11, fillChar = None)
 				sleep(1.0)
-			self.printText("Turn off in  s", row = 4, col = 2)
+			self.printText("Turn off in  s", line = 4, col = 2)
 			for i in range(3, 0, -1):
-				self.printText(str(i), row = 4, col = 14, fillChar = None)
+				self.printText(str(i), line = 4, col = 14, fillChar = None)
 				sleep(1.0)
 			self.clearScreen()
 			self.backLight = False
@@ -244,4 +244,7 @@ class ST792012864SPI(BaseLCD):
 		GPIO.setup(self.rst, GPIO.OUT)
 		if self.bl is not None:
 			GPIO.setup(self.bl, GPIO.OUT)
+		self._textMode = True
+		self._hcgrom = True
+		self._textBuf = [ BLANK_LINE, BLANK_LINE, BLANK_LINE, BLANK_LINE ]
 
