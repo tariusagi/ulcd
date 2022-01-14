@@ -34,8 +34,12 @@ This program need `ncat`, and this project's `lcd` program on PATH.
 
 Usage:
 
-```sh
-sudo ./lcdserver server 127.0.0.1 1234
+```txt
+Syntax: lcdserver -h -w -l file <-t type> <ip> <port>
+where:
+-h      Print this usage.
+-l      Log to the given file.
+-t type Set the LCD type for "lcd" command. Run "lcd -h" for help.
 ```
 
 To send command to this server, use `nc`, `ncat` or nay network client. For example, the following command tell the server to clear the LCD:
@@ -73,8 +77,6 @@ Supported commands are:
 - `line2` text: Show the text on the LCD's second line.
 - `display`: display line 1 and line 2 on the LCD.
 
-To enable logging, add "log" at the end of command. The server's log is at `/var/log/lcdserver.log`.
-
 To run this server at boot, use `/etc/rc.local` or create a service file `/etc/systemd/system/lcdserver.service` like this (assumming path to this server is at `/usr/local/bin/lcdserver`):
 
 ```systemd
@@ -86,7 +88,7 @@ After=network-online.target
 [Service]
 User=peter
 Group=peter
-ExecStart=/usr/local/bin/lcdserver server 0.0.0.0 1234
+ExecStart=/usr/local/bin/lcdserver -t st7920 0.0.0.0 1234
 ExecReload=/bin/bash -c 'echo clear | nc -w1 127.0.0.1 1234'
 Restart=on-failure
 RestartSec=60
@@ -109,11 +111,11 @@ To start the server as a service.
 
 A Python 3 module to control the 128x64 LCD with ST7290 driver. Bases on [RPi-12864-LCD-ST7920-lib](https://github.com/SrBrahma/RPi-12864-LCD-ST7920-lib).
 
-Wiring scheme (BCM pin naming):
+Wiring scheme:
 
 ```txt
-LCD   GPIO
----   ----
+LCD   GPIO (BCM)
+---   ----------
 GND - Ground
 VCC - +5V
 VO  - +5V with 10K potentionmeter to adjust contrast
@@ -133,7 +135,6 @@ If you don't want to control the backlight, just connect the BLA pin to a +5V 60
 A Python 3 program to demonstrate the 128x64 ST7920 LCD. Running without argument to display a simple test or "all" to perform a full demonstration with texts, custom fonts and graphics.
 
 ## hd44780.py
-*This module is a work in progress, not ready to use yet*
 
 A Python 3 module to control a 16x2 monochrome LCD screen. Based on this [Interfacing 16x2 LCD with Raspberry Pi](https://www.electronicshub.org/interfacing-16x2-lcd-with-raspberry-pi/). Tested on a Raspberry Pi Zero W.
 
@@ -144,13 +145,17 @@ A 10kΩ potentionmeter MUST BE NEEDED to adjust the contrast of the LCD, such as
 Wiring scheme (using Raspberry Pi's physical pin number):
 
 ```txt
-LCD   GPIO
----   ----
-D4  - 15
-D5  - 16
+LCD   GPIO (BCM)
+---   ----------
+VDD - +5V
+VSS - Ground
+V0  - Pin 3 (possitive) of a 10kΩ potentionmeter
+RS  - 25
+RW  - Ground (to write data)
+E   - 24
+D4  - 23
+D5  - 17
 D6  - 18
 D7  - 22
-E   - 11
-RS  - 13
 ```
 
