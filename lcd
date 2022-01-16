@@ -28,7 +28,7 @@ def main():
 	# Default settings.
 	lcdType = None
 	init = False
-	backLight = None
+	backlight = None
 	clear = False
 	demo = False
 	printParams = False
@@ -53,9 +53,9 @@ def main():
 			print(USAGE)
 			sys.exit(0)
 		elif o == '-b':
-			backLight = False
+			backlight = False
 		elif o == '-B':
-			backLight = True
+			backlight = True
 		elif o == '-c':
 			col = int(v)
 		elif o == '-d':
@@ -102,8 +102,8 @@ def main():
 			sys.exit(0)
 		if init:
 			lcd.init()
-		if backLight is not None:
-			lcd.backLight = backLight
+		if backlight is not None:
+			lcd.backlight = backlight
 		if clear:
 			lcd.clearScreen()
 		if len(text):

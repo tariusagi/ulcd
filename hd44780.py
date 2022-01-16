@@ -31,56 +31,56 @@ class HD44780(BaseLCD):
   D7  - 22
 	"""
 
-	def __init__(self, rs = 25, en = 24, d4 = 23, d5 = 17, d6 = 18, d7 = 22):
+	def __init__(self, rs = 25, e = 24, d4 = 23, d5 = 17, d6 = 18, d7 = 22):
 		super().__init__(driver = "HD44780", 
-				en = en, rs = rs, d4 = d4, d5 = d5, d6 = d6, d7 = d7,
+				e = e, rs = rs, d4 = d4, d5 = d5, d6 = d6, d7 = d7,
 				columns = 16, lines = 2)
 		GPIO.setwarnings(False)
 		GPIO.setmode(GPIO.BCM)
-		GPIO.setup(self.en, GPIO.OUT)
-		GPIO.setup(self.rs, GPIO.OUT)
-		GPIO.setup(self.d4, GPIO.OUT)
-		GPIO.setup(self.d5, GPIO.OUT)
-		GPIO.setup(self.d6, GPIO.OUT)
-		GPIO.setup(self.d7, GPIO.OUT)
+		GPIO.setup(self._e, GPIO.OUT)
+		GPIO.setup(self._rs, GPIO.OUT)
+		GPIO.setup(self._d4, GPIO.OUT)
+		GPIO.setup(self._d5, GPIO.OUT)
+		GPIO.setup(self._d6, GPIO.OUT)
+		GPIO.setup(self._d7, GPIO.OUT)
 
 	def _toggleEn(self):
 		#  sleep(E_DELAY)
-		GPIO.output(self.en, True)
+		GPIO.output(self._e, True)
 		#  sleep(E_PULSE)
-		GPIO.output(self.en, False)
+		GPIO.output(self._e, False)
 		#  sleep(E_DELAY)
 	 
 	def _sendByte(self, byte, mode):
 		"""Send one byte to the LCD. mode True for character, False for command."""
-		GPIO.output(self.rs, mode)
+		GPIO.output(self._rs, mode)
 		# High bits.
-		GPIO.output(self.d4, False)
-		GPIO.output(self.d5, False)
-		GPIO.output(self.d6, False)
-		GPIO.output(self.d7, False)
+		GPIO.output(self._d4, False)
+		GPIO.output(self._d5, False)
+		GPIO.output(self._d6, False)
+		GPIO.output(self._d7, False)
 		if byte&0x10==0x10:
-			GPIO.output(self.d4, True)
+			GPIO.output(self._d4, True)
 		if byte&0x20==0x20:
-			GPIO.output(self.d5, True)
+			GPIO.output(self._d5, True)
 		if byte&0x40==0x40:
-			GPIO.output(self.d6, True)
+			GPIO.output(self._d6, True)
 		if byte&0x80==0x80:
-			GPIO.output(self.d7, True)
+			GPIO.output(self._d7, True)
 		self._toggleEn()
 		# Low bits.
-		GPIO.output(self.d4, False)
-		GPIO.output(self.d5, False)
-		GPIO.output(self.d6, False)
-		GPIO.output(self.d7, False)
+		GPIO.output(self._d4, False)
+		GPIO.output(self._d5, False)
+		GPIO.output(self._d6, False)
+		GPIO.output(self._d7, False)
 		if byte&0x01==0x01:
-			GPIO.output(self.d4, True)
+			GPIO.output(self._d4, True)
 		if byte&0x02==0x02:
-			GPIO.output(self.d5, True)
+			GPIO.output(self._d5, True)
 		if byte&0x04==0x04:
-			GPIO.output(self.d6, True)
+			GPIO.output(self._d6, True)
 		if byte&0x08==0x08:
-			GPIO.output(self.d7, True)
+			GPIO.output(self._d7, True)
 		self._toggleEn()
 	 
 	def init(self):

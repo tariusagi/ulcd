@@ -4,38 +4,47 @@ class BaseLCD:
 	"""Base class for all LCDs"""
 
 	def __init__(self, driver = "Base", 
-			rs = None, en = None, rw = None, rst = None, bl = None,
+			rs = None, e = None, rw = None, rst = None, bla = None,
 			d0 = None, d1 = None, d2 = None, d3 = None, 
 			d4 = None, d5 = None, d6 = None, d7 = None, 
 			columns = None, lines = None, width = None, height = None):
 		if rw is None:
-			self.interface = "Parallel"
+			self._interface = "Parallel"
 		else:
-			self.interface = "SPI"
+			self._interface = "SPI"
 		if d0 is None:
 			# 4 bits mode.
-			self.bits = 4
+			self._bits = 4
 		else:
 			# 8 bits mode.
 			selft.bits = 8
-		self.d0 = d0 # Bit 0
-		self.d1 = d1 # Bit 1
-		self.d2 = d2 # Bit 2
-		self.d3 = d3 # Bit 3
-		self.d4 = d4 # Bit 4
-		self.d5 = d5 # Bit 5
-		self.d6 = d6 # Bit 6
-		self.d7 = d7 # Bit 7
-		self.driver = driver
-		self.rs = rs # Register select
-		self.en = en # Clock enable
-		self.rw = rw # Read/Write
-		self.rst = rst # Reset
-		self.bl = bl # Backlight
-		self.columns = columns # Max text columns
-		self.lines = lines # Max text lines 
-		self.width = width # Max width in pixels
-		self.height = height # Max height in pixels
+		self._d0 = d0 # Bit 0
+		self._d1 = d1 # Bit 1
+		self._d2 = d2 # Bit 2
+		self._d3 = d3 # Bit 3
+		self._d4 = d4 # Bit 4
+		self._d5 = d5 # Bit 5
+		self._d6 = d6 # Bit 6
+		self._d7 = d7 # Bit 7
+		self._driver = driver
+		self._rs = rs # Register select
+		self._e = e # Clock enable
+		self._rw = rw # Read/Write
+		self._rst = rst # Reset
+		self._bla = bla # Backlight anode
+		self._maxCols = columns # Max text columns
+		self._maxLines = lines # Max text lines 
+		self._width = width # Max width in pixels
+		self._height = height # Max height in pixels
+		self._backlight = False
+
+	@property
+	def backlight(self):
+		return self._backlight
+
+	@backlight.setter
+	def backLight(self, state):
+		self._backlight = state
 
 	def demo(self):
 		"""Perform demonstration on supported LCD"""
@@ -44,24 +53,24 @@ class BaseLCD:
 
 	def printParams(self):
 		"""Print all LCD's parameters to stdout"""
-		self.driver and print("Driver:", self.driver)
-		self.interface and print("Interface:", self.interface)
-		self.bits and print("Bits:", self.bits)
-		self.rs and print("RS  = ", self.rs)
-		self.en and print("EN  = ", self.en)
-		self.rw and print("RW  = ", self.rw)
-		self.rst and print("RST = ", self.rst)
-		self.bl and print("BLA = ", self.bl)
-		self.d0 and print("D0  = ", self.d0)
-		self.d1 and print("D0  = ", self.d1)
-		self.d2 and print("D0  = ", self.d2)
-		self.d3 and print("D0  = ", self.d3)
-		self.d4 and print("D0  = ", self.d4)
-		self.d5 and print("D0  = ", self.d5)
-		self.d6 and print("D0  = ", self.d6)
-		self.d7 and print("D0  = ", self.d7)
-		self.columns and print("Columns = ", self.columns)
-		self.lines and print("Lines = ", self.lines)
-		self.width and print("Width = ", self.width)
-		self.height and print("Height = ", self.height)
+		self._driver and print("Driver:", self._driver)
+		self._interface and print("Interface:", self._interface)
+		self._bits and print("Bits:", self._bits)
+		self._rs and print("RS  = ", self._rs)
+		self._e and print("EN  = ", self._e)
+		self._rw and print("RW  = ", self._rw)
+		self._rst and print("RST = ", self._rst)
+		self._bla and print("BLA = ", self._bla)
+		self._d0 and print("D0  = ", self._d0)
+		self._d1 and print("D0  = ", self._d1)
+		self._d2 and print("D0  = ", self._d2)
+		self._d3 and print("D0  = ", self._d3)
+		self._d4 and print("D0  = ", self._d4)
+		self._d5 and print("D0  = ", self._d5)
+		self._d6 and print("D0  = ", self._d6)
+		self._d7 and print("D0  = ", self._d7)
+		self._maxCols and print("Columns = ", self._maxCols)
+		self._maxLines and print("Lines = ", self._maxLines)
+		self._width and print("Width = ", self._width)
+		self._height and print("Height = ", self._height)
 

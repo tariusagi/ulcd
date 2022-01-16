@@ -21,26 +21,26 @@ class ST792012864SPI(BaseLCD):
 		sleep(0)
 
 	def _strobe(self):
-		GPIO.output(self.en, True)
+		GPIO.output(self._e, True)
 		self._quickSleep()
-		GPIO.output(self.en, False)
+		GPIO.output(self._e, False)
 
 	def _strobe4(self):
 		for i in range(4):
-			GPIO.output(self.en, True)
+			GPIO.output(self._e, True)
 			sleep(0)
-			GPIO.output(self.en, False)
+			GPIO.output(self._e, False)
 			sleep(0)
 
 	def _strobe5(self):
 		for i in range(5):
-			GPIO.output(self.en, True)
+			GPIO.output(self._e, True)
 			sleep(0)
-			GPIO.output(self.en, False)
+			GPIO.output(self._e, False)
 			sleep(0)
   
 	def _setRw(self, state):
-		GPIO.output(self.rw, state)
+		GPIO.output(self._rw, state)
 
 	def _sendByte(self, rs, byte):
 		"""Send one byte. rs = 0 for command, 1 for data"""
@@ -116,26 +116,22 @@ class ST792012864SPI(BaseLCD):
 		if self._hcgrom:
 			addr += (col - 1) // 2
 		self._sendByte(LCD_CMD, addr)
-
-	@property
-	def backLight(self):
-		return self._backlight
-
-	@backLight.setter
-	def backLight(self, state):
+	
+	@BaseLCD.backlight.setter
+	def backlight(self, state):
 		self._backlight = state
-		if self.bl is not None:
-			GPIO.output(self.bl, state)
+		if self._bla is not None:
+			GPIO.output(self._bla, state)
 
 	def cleanup(self):
 		GPIO.cleanup()
 
 	def init(self): 
-		GPIO.output(self.rw, False)
-		GPIO.output(self.en, False)
-		GPIO.output(self.rst, False)
+		GPIO.output(self._rw, False)
+		GPIO.output(self._e, False)
+		GPIO.output(self._rst, False)
 		sleep(0.1)
-		GPIO.output(self.rst, True)
+		GPIO.output(self._rst, True)
 		#
 		self._sendByte(LCD_CMD, 0b00110000)  # Function set (8 bit)
 		self._sendByte(LCD_CMD, 0b00110000)  # Function set (basic instruction set)
@@ -234,16 +230,16 @@ class ST792012864SPI(BaseLCD):
 		finally:
 			self.cleanup()
 
-	def __init__(self, en = 11, rw = 10, rst = 25, bl = 24):
-		super().__init__(driver = "ST7290", en = en, rw = rw, rst = rst, bl = bl,
+	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24):
+		super().__init__(driver = "ST7290", e = e, rw = rw, rst = rst, bla = bla,
 				columns = 16, lines = 4, width = 128, height = 64)
 		GPIO.setwarnings(False)
 		GPIO.setmode(GPIO.BCM)
-		GPIO.setup(self.rw, GPIO.OUT)
-		GPIO.setup(self.en, GPIO.OUT)
-		GPIO.setup(self.rst, GPIO.OUT)
-		if self.bl is not None:
-			GPIO.setup(self.bl, GPIO.OUT)
+		GPIO.setup(self._rw, GPIO.OUT)
+		GPIO.setup(self._e, GPIO.OUT)
+		GPIO.setup(self._rst, GPIO.OUT)
+		if self._bla is not None:
+			GPIO.setup(self._bla, GPIO.OUT)
 		self._textMode = True
 		self._hcgrom = True
 		self._textBuf = [ BLANK_LINE, BLANK_LINE, BLANK_LINE, BLANK_LINE ]
