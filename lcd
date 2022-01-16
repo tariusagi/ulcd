@@ -103,7 +103,7 @@ def main():
 		if init:
 			lcd.init()
 		if backlight is not None:
-			lcd.backlight = backlight
+			lcd.backlight(backlight)
 		if clear:
 			lcd.clearScreen()
 		if len(text):

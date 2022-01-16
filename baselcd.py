@@ -1,4 +1,5 @@
 import sys
+import RPi.GPIO as GPIO
 
 class BaseLCD:
 	"""Base class for all LCDs"""
@@ -38,12 +39,9 @@ class BaseLCD:
 		self._height = height # Max height in pixels
 		self._backlight = False
 
-	@property
-	def backlight(self):
-		return self._backlight
-
-	@backlight.setter
-	def backLight(self, state):
+	def backlight(self, state):
+		"""Set backlight on if state is True, or off if False. The real operation
+		must be implemented by child classes"""
 		self._backlight = state
 
 	def demo(self):

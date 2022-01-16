@@ -117,9 +117,8 @@ class ST792012864SPI(BaseLCD):
 			addr += (col - 1) // 2
 		self._sendByte(LCD_CMD, addr)
 	
-	@BaseLCD.backlight.setter
 	def backlight(self, state):
-		self._backlight = state
+		super().backlight(state)
 		if self._bla is not None:
 			GPIO.output(self._bla, state)
 
@@ -147,16 +146,21 @@ class ST792012864SPI(BaseLCD):
 		self._textBuf = [ BLANK_LINE, BLANK_LINE, BLANK_LINE, BLANK_LINE ]
 
 	def printText(self, text, line = 1, col = 1, fillChar = ' '): 
-		"""Print a text at the given line (1..4) and column (1..16)"""
+		"""Print a text at the given line and column. Missing character will be 
+		filled with fillChar, default is space. If fillChar is None, then the text
+		will be printed as-is"""
+		if line < 1 or line > self._maxLines or col < 1 or col > self._maxCols:
+			# Ignore invalid position.
+			return
 		# Trim text longer than 16 characters.
 		if fillChar is not None:
 			if col > 1:
 				text = text.rjust(col + len(text) - 1, fillChar)
-			if len(text) < 16:
-				text = text.ljust(16, fillChar)
+			if len(text) < self._maxCols:
+				text = text.ljust(self._maxCols, fillChar)
 			col = 1
-		if (len(text) + col > 17):
-			text = text[0:16 - col]
+		if (len(text) + col > self._maxCols + 1):
+			text = text[0:self._maxCols - col]
 		# Merge into text buffer.
 		s = list(self._textBuf[line - 1])
 		for i in range(len(text)):

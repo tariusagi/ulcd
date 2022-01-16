@@ -8,11 +8,7 @@ from baselcd import BaseLCD
 
 DATA_MODE = True
 CMD_MODE = False
- 
 LINE_ADDR = [ 0x80, 0xC0 ]
-
-#  E_PULSE = 0.0005
-#  E_DELAY = 0.0005
 
 class HD44780(BaseLCD):
 	"""Handle LCD with Hitachi HD44780 chip in 4 bit parallel mode.  The default
@@ -29,11 +25,13 @@ class HD44780(BaseLCD):
   D5  - 17
   D6  - 18
   D7  - 22
+	A   - 26 
 	"""
 
-	def __init__(self, rs = 25, e = 24, d4 = 23, d5 = 17, d6 = 18, d7 = 22):
+	def __init__(self, rs = 25, e = 24, bla = 26, 
+			d4 = 23, d5 = 17, d6 = 18, d7 = 22):
 		super().__init__(driver = "HD44780", 
-				e = e, rs = rs, d4 = d4, d5 = d5, d6 = d6, d7 = d7,
+				e = e, rs = rs, bla = bla, d4 = d4, d5 = d5, d6 = d6, d7 = d7,
 				columns = 16, lines = 2)
 		GPIO.setwarnings(False)
 		GPIO.setmode(GPIO.BCM)
@@ -43,61 +41,69 @@ class HD44780(BaseLCD):
 		GPIO.setup(self._d5, GPIO.OUT)
 		GPIO.setup(self._d6, GPIO.OUT)
 		GPIO.setup(self._d7, GPIO.OUT)
+		if self._bla is not None:
+			GPIO.setup(self._bla, GPIO.OUT)
 
-	def _toggleEn(self):
-		#  sleep(E_DELAY)
+	def _pulse(self):
 		GPIO.output(self._e, True)
-		#  sleep(E_PULSE)
 		GPIO.output(self._e, False)
-		#  sleep(E_DELAY)
 	 
+	def _sendNibble(self, nibble):
+		GPIO.output(self._d4, nibble & 0b0001 != 0)
+		GPIO.output(self._d5, nibble & 0b0010 != 0)
+		GPIO.output(self._d6, nibble & 0b0100 != 0)
+		GPIO.output(self._d7, nibble & 0b1000 != 0)
+
 	def _sendByte(self, byte, mode):
 		"""Send one byte to the LCD. mode True for character, False for command."""
 		GPIO.output(self._rs, mode)
-		# High bits.
-		GPIO.output(self._d4, False)
-		GPIO.output(self._d5, False)
-		GPIO.output(self._d6, False)
-		GPIO.output(self._d7, False)
-		if byte&0x10==0x10:
-			GPIO.output(self._d4, True)
-		if byte&0x20==0x20:
-			GPIO.output(self._d5, True)
-		if byte&0x40==0x40:
-			GPIO.output(self._d6, True)
-		if byte&0x80==0x80:
-			GPIO.output(self._d7, True)
-		self._toggleEn()
-		# Low bits.
-		GPIO.output(self._d4, False)
-		GPIO.output(self._d5, False)
-		GPIO.output(self._d6, False)
-		GPIO.output(self._d7, False)
-		if byte&0x01==0x01:
-			GPIO.output(self._d4, True)
-		if byte&0x02==0x02:
-			GPIO.output(self._d5, True)
-		if byte&0x04==0x04:
-			GPIO.output(self._d6, True)
-		if byte&0x08==0x08:
-			GPIO.output(self._d7, True)
-		self._toggleEn()
+		# High 4 bits.
+		self._sendNibble(byte >> 4)
+		self._pulse()
+		# Low 4 bits.
+		self._sendNibble(byte & 0xF)
+		self._pulse()
 	 
 	def init(self):
-		self._sendByte(0x28,CMD_MODE) # Set 4 bits, 2 lines, default font.
-		self._sendByte(0x0C,CMD_MODE) # Display, cursor and blinking all off.
-		#  sleep(E_DELAY)
+		GPIO.output(self._rs, False)
+		self._sendNibble(0x03)
+		self._pulse()
+		self._pulse()
+		self._pulse()
+		self._sendNibble(0x02)
+		self._pulse()
+		self._sendByte(0x28, CMD_MODE) # Set 4 bits interface with 2 lines.
+		self._sendByte(0x0C, CMD_MODE) # Display On,Cursor Off, Blink Off
 	 
 	def clearScreen(self):
 		self._sendByte(0x01,CMD_MODE) # Clear display
+		sleep(0.01)
 
-	def printText(self, text, line = 1, col = 1):
-		# Avoid unused warning.
-		col = None
-		text = text.ljust(self.columns," ")
-		self._sendByte(LINE_ADDR[line - 1], CMD_MODE)
-		for i in range(self.columns):
+	def printText(self, text, line = 1, col = 1, fillChar = ' '): 
+		"""Print a text at the given line and column. Missing character will be 
+		filled with fillChar, default is space. If fillChar is None, then the text
+		will be printed as-is"""
+		if line < 1 or line > self._maxLines or col < 1 or col > self._maxCols:
+			# Ignore invalid position.
+			return
+		# Trim text longer than 16 characters.
+		if fillChar is not None:
+			if col > 1:
+				text = text.rjust(col + len(text) - 1, fillChar)
+			if len(text) < self._maxCols:
+				text = text.ljust(self._maxCols, fillChar)
+			col = 1
+		if (len(text) + col > self._maxCols + 1):
+			text = text[0:self._maxCols - col]
+		# Now send to LCD.
+		self._sendByte(LINE_ADDR[line - 1] + col - 1, CMD_MODE)
+		for i in range(self._maxCols):
 			self._sendByte(ord(text[i]),DATA_MODE)
+
+	def backlight(self, state):
+		super().backlight(state)
+		if self._bla is not None:
+			GPIO.output(self._bla, state)
 
 	def demo(self):
 		print("Running a demo...")
