@@ -197,7 +197,7 @@ class ST792012864SPI(BaseLCD):
 	def demo(self):
 		try:
 			self.init()
-			self.backLight = True
+			self.backlight(True)
 
 			self.printText("ST7920 demo:")
 			self.printText("Hi, how are you?", line = 2)
@@ -230,7 +230,7 @@ class ST792012864SPI(BaseLCD):
 				self.printText(str(i), line = 4, col = 14, fillChar = None)
 				sleep(1.0)
 			self.clearScreen()
-			self.backLight = False
+			self.backlight(False)
 		finally:
 			self.cleanup()
 

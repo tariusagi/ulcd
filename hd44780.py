@@ -97,7 +97,7 @@ class HD44780(BaseLCD):
 			text = text[0:self._maxCols - col]
 		# Now send to LCD.
 		self._sendByte(LINE_ADDR[line - 1] + col - 1, CMD_MODE)
-		for i in range(self._maxCols):
+		for i in range(len(text)):
 			self._sendByte(ord(text[i]),DATA_MODE)
 
 	def backlight(self, state):
@@ -107,18 +107,22 @@ class HD44780(BaseLCD):
 
 	def demo(self):
 		print("Running a demo...")
+		self.init()
 		self.clearScreen()
+		self.backlight(True)
 		sleep(1)
-		self.printText("    HD44780", line = 1)
-		self.printText(" 16x2 LCD demo", line = 2)
+		self.printText("HD44780", line = 1, col = 6)
+		self.printText("16x2 LCD demo", line = 2, col = 3)
 		sleep(3)
 		self.printText("1234567890*@$#%&", line = 1)
 		self.printText("abcdefghijklmnop", line = 2)
 		sleep(3)
 		self.printText("ABCDEFGHIJKLMNOP", line = 2)
 		sleep(3)
-		self.printText("Have a nice day!", line = 1)
-		self.printText("    The end", line = 2)
-		sleep(3)
-		print("End of demo.")
+		self.printText("End of demo", line = 1, col = 4)
+		self.printText("Off in  s", line = 2, col = 5)
+		for i in range(4, 0, -1):
+			self.printText(str(i), line = 2, col = 12, fillChar = None)
+			sleep(1)
+		self.backlight(False)
 
