@@ -18,18 +18,19 @@ class HD44780(BaseLCD):
   VDD - +5V
   VSS - Ground
   V0  - Pin 3 (possitive) of a 10kΩ potentionmeter 
-  RS  - 25
+  RS  - 17
   RW  - Ground (to write data)
-  E   - 24
-  D4  - 23
-  D5  - 17
-  D6  - 18
-  D7  - 22
-	A   - 26 
+  E   - 27
+  D4  - 22
+  D5  - 5
+  D6  - 6
+  D7  - 26
+	A   - 16 (backlight anode) 
+	K   - Ground (backlight kathode)
 	"""
 
-	def __init__(self, rs = 25, e = 24, bla = 26, 
-			d4 = 23, d5 = 17, d6 = 18, d7 = 22):
+	def __init__(self, rs = 17, e = 27, bla = 16, 
+			d4 = 22, d5 = 5, d6 = 6, d7 = 26):
 		super().__init__(driver = "HD44780", 
 				e = e, rs = rs, bla = bla, d4 = d4, d5 = d5, d6 = d6, d7 = d7,
 				columns = 16, lines = 2)

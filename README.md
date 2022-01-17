@@ -142,20 +142,24 @@ Connect LCD's VDD and VSS pins to +5V and ground to power the LCD.
 
 A 10kΩ potentionmeter MUST BE NEEDED to adjust the contrast of the LCD, such as the 3362P square potentionmeter. Connect pin 1 of the potentionmeter to the +5V power supply, pin 3 to the ground, and pin 2 to the V0 (contrast) pin of the LCD. Then adjust the potentionmeter until the contrast is right.
 
-Wiring scheme (using Raspberry Pi's physical pin number):
+Wiring scheme:
 
 ```txt
 LCD   GPIO (BCM)
 ---   ----------
 VDD - +5V
 VSS - Ground
-V0  - Pin 3 (possitive) of a 10kΩ potentionmeter
-RS  - 25
+V0  - Pin 3 (possitive) of a 10kΩ potentionmeter 
+RS  - 17
 RW  - Ground (to write data)
-E   - 24
-D4  - 23
-D5  - 17
-D6  - 18
-D7  - 22
+E   - 27
+D4  - 22
+D5  - 5
+D6  - 6
+D7  - 26
+A   - 16 (backlight anode) 
+K   - Ground (backlight kathode)
 ```
 
+Note that this wiring avoid pins used in the ST7920 scheme, so both LCD can be
+installed on one single Pi board.
