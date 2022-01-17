@@ -94,8 +94,8 @@ class HD44780(BaseLCD):
 			if len(text) < self._maxCols:
 				text = text.ljust(self._maxCols, fillChar)
 			col = 1
-		if (len(text) + col > self._maxCols + 1):
-			text = text[0:self._maxCols - col]
+		if (len(text) + col - 1 > self._maxCols):
+			text = text[0:self._maxCols - col + 1]
 		# Now send to LCD.
 		self._sendByte(LINE_ADDR[line - 1] + col - 1, CMD_MODE)
 		for i in range(len(text)):
