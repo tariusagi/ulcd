@@ -35,7 +35,7 @@ log() {
 on_exit() {
 	# Reset the LCD and turn off the backlight.
 	log Reset and turn off the LCD on exit.
-	lcd -t $lcd_type -i -b > /dev/null
+	lcd -t $lcd_type -i -x -b > /dev/null
 }
 
 # Check the number of given command line arguments.
@@ -103,8 +103,7 @@ if [ -z "$worker" ]; then
 	# Initialize the LCD.
 	lcd -t $lcd_type -i -x -B "LCDSERVER..." > /dev/null
 	# Handle SIGTERM.
-	trap "on_exit" TERM
-	trap "on_exit" INT
+	trap "on_exit" TERM INT
 	# Use ncat to listen to network connections and let it call this script back 
 	# in worker mode.
 	log Listening at $ip:$port, LCD $lcd_type, worker at $SCRIPT_FULLPATH
