@@ -4,8 +4,9 @@ from time import sleep
 import RPi.GPIO as GPIO
 from baselcd import BaseLCD
 
-LCD_CMD = 0
-LCD_DATA = 1
+LCD_CMD = GPIO.LOW
+LCD_DATA = GPIO.HIGH
+E_DELAY=0
 BLANK_LINE = "                "
 
 class ST792012864SPI(BaseLCD):
@@ -17,92 +18,85 @@ class ST792012864SPI(BaseLCD):
 		BLA = 24
 	"""
 
-	def _quickSleep(self):
-		sleep(0)
+	def _pulse(self):
+		GPIO.output(self._e, GPIO.HIGH)
+		GPIO.output(self._e, GPIO.LOW)
 
-	def _strobe(self):
-		GPIO.output(self._e, True)
-		self._quickSleep()
-		GPIO.output(self._e, False)
-
-	def _strobe4(self):
+	def _pulse4(self):
 		for i in range(4):
-			GPIO.output(self._e, True)
-			sleep(0)
-			GPIO.output(self._e, False)
-			sleep(0)
+			GPIO.output(self._e, GPIO.HIGH)
+			GPIO.output(self._e, GPIO.LOW)
 
-	def _strobe5(self):
+	def _pulse5(self):
 		for i in range(5):
-			GPIO.output(self._e, True)
-			sleep(0)
-			GPIO.output(self._e, False)
-			sleep(0)
+			GPIO.output(self._e, GPIO.HIGH)
+			GPIO.output(self._e, GPIO.LOW)
   
 	def _setRw(self, state):
 		GPIO.output(self._rw, state)
 
-	def _sendByte(self, rs, byte):
-		"""Send one byte. rs = 0 for command, 1 for data"""
+	def _sendByte(self, mode, byte):
+		"""Send one byte. mode = 0 for command, 1 for data"""
 		# Data alert.
-		self._setRw(1)
-		self._strobe5()
-		self._setRw(0)
-		self._strobe()                                                                                  
+		GPIO.output(self._rw, GPIO.HIGH)
+		self._pulse5()
+		GPIO.output(self._rw, GPIO.LOW)
+		self._pulse()                                                                                  
 		# Select the register.
-		self._setRw(rs)
-		self._strobe()
-		self._setRw(0)
-		self._strobe()
+		GPIO.output(self._rw, mode)
+		self._pulse()
+		GPIO.output(self._rw, GPIO.LOW)
+		self._pulse()
 		# Send the first half.
 		for i in range(7, 3, -1):
-			self._setRw(byte & (1 << i))
-			self._strobe()
-		self._setRw(0)
-		self._strobe4()
+			GPIO.output(self._rw, byte & (1 << i))
+			self._pulse()
+		GPIO.output(self._rw, GPIO.LOW)
+		self._pulse4()
 		# Send the last half.
 		for i in range(3, -1, -1):
-			self._setRw(byte & (1 << i))
-			self._strobe()
-		self._setRw(0)
-		self._strobe4()
+			GPIO.output(self._rw, byte & (1 << i))
+			self._pulse()
+		GPIO.output(self._rw, GPIO.LOW)
+		self._pulse4()
 
-	def _send2Bytes(self, rs, hi, lo):
-		"""Send 2 bytes at once without interruption between them"""
+	def _send2Bytes(self, mode, hi, lo):
+		"""Send 2 bytes at once without interruption between them. mode = 0 for 
+		command, 1 for data"""
 		# Data alert.
-		self._setRw(1)
-		self._strobe5()
+		GPIO.output(self._rw, GPIO.HIGH)
+		self._pulse5()
 		# Select the register.
-		self._setRw(0)
-		self._strobe()
-		self._setRw(rs)
-		self._strobe()
-		self._setRw(0)
-		self._strobe()
+		GPIO.output(self._rw, GPIO.LOW)
+		self._pulse()
+		GPIO.output(self._rw, mode)
+		self._pulse()
+		GPIO.output(self._rw, GPIO.LOW)
+		self._pulse()
 		# Send the hi byte's hi half.
 		for i in range(7, 3, -1):
-			self._setRw(hi & (1 << i))
-			self._strobe()
-		self._setRw(0)
-		self._strobe4()
+			GPIO.output(self._rw, hi & (1 << i))
+			self._pulse()
+		GPIO.output(self._rw, GPIO.LOW)
+		self._pulse4()
 		# Send the hi byte's last half.
 		for i in range(3, -1, -1):    
-			self._setRw(hi & (1 << i))
-			self._strobe()
-		self._setRw(0)
-		self._strobe4()
+			GPIO.output(self._rw, hi & (1 << i))
+			self._pulse()
+		GPIO.output(self._rw, GPIO.LOW)
+		self._pulse4()
 		# Send the lo byte's hi half.
 		for i in range(7, 3, -1):
-			self._setRw(lo & (1 << i))
-			self._strobe()
-		self._setRw(0)
-		self._strobe4()
+			GPIO.output(self._rw, lo & (1 << i))
+			self._pulse()
+		GPIO.output(self._rw, GPIO.LOW)
+		self._pulse4()
 		# Send the lo byte's last half.
 		for i in range(3, -1, -1):
-			self._setRw(lo & (1 << i))
-			self._strobe()
-		self._setRw(0)
-		self._strobe4()
+			GPIO.output(self._rw, lo & (1 << i))
+			self._pulse()
+		GPIO.output(self._rw, GPIO.LOW)
+		self._pulse4()
 
 	def _setCaret(self, line, col): 
 		"""Position text caret at the given line (1..4) and column (1..16)"""
@@ -126,11 +120,11 @@ class ST792012864SPI(BaseLCD):
 		GPIO.cleanup()
 
 	def init(self): 
-		GPIO.output(self._rw, False)
-		GPIO.output(self._e, False)
-		GPIO.output(self._rst, False)
-		sleep(0.1)
-		GPIO.output(self._rst, True)
+		GPIO.output(self._rw, GPIO.LOW)
+		GPIO.output(self._e, GPIO.LOW)
+		GPIO.output(self._rst, GPIO.LOW)
+		sleep(E_DELAY)
+		GPIO.output(self._rst, GPIO.HIGH)
 		#
 		self._sendByte(LCD_CMD, 0b00110000)  # Function set (8 bit)
 		self._sendByte(LCD_CMD, 0b00110000)  # Function set (basic instruction set)
