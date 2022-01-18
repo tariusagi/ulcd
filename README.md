@@ -163,3 +163,26 @@ K   - Ground (backlight kathode)
 
 Note that this wiring avoid pins used in the ST7920 scheme, so both LCD can be
 installed on one single Pi board.
+
+## hd44780opi.py
+
+This module is similar to hd44780.py, specifically crafted for Orange Pi Zero2 board. It need the [OPi.GPIO](https://opi-gpio.readthedocs.io/en/latest/) module, which can be installed with `sudo pip install --upgrade OPi.GPIO`.
+
+Wiring scheme (physical pin number):
+
+```txt
+LCD   GPIO (Physical)
+---   ---------------
+VDD - +5V
+VSS - Ground
+V0  - Pin 3 (possitive) of a 10kΩ potentionmeter 
+RS  - 26
+RW  - Ground (to write data)
+E   - 24
+D4  - 22
+D5  - 18
+D6  - 16
+D7  - 12
+A   - 10 (backlight anode) 
+K   - Ground (backlight kathode)
+```

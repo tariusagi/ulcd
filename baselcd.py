@@ -1,5 +1,4 @@
 import sys
-import RPi.GPIO as GPIO
 
 class BaseLCD:
 	"""Base class for all LCDs"""

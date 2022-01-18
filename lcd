@@ -17,7 +17,7 @@ OPTION:
 -h      Display this help and exit.
 -i      Initialize/reset LCD (effectively clear the screen).
 -p      Print LCD parameters.
--t      LCD type. Supported type are hd44780, st7920. This is required.
+-t      LCD type (required). Supported type are hd44780, hd44780opi, st7920.
 -x      Clear the LCD screen.
 -r      Restore GPIO settings (default is not).
 -l n    Move text cursor to line n (start from 1, default 1).
@@ -87,6 +87,9 @@ def main():
 	elif lcdType == "hd44780":
 		from hd44780 import HD44780
 		lcd = HD44780()
+	elif lcdType == "hd44780opi":
+		from hd44780opi import HD44780OPiH616
+		lcd = HD44780OPiH616()
 	else:
 		print('ERROR: unsupported LCD.', file = sys.stderr)
 		sys.exit(3)

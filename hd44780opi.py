@@ -2,7 +2,7 @@
 import os
 import sys
 import getopt
-import RPi.GPIO as GPIO
+import OPi.GPIO as GPIO
 from time import sleep
 from baselcd import BaseLCD
 
@@ -11,32 +11,34 @@ CMD_MODE = GPIO.LOW
 E_DELAY=0.001
 LINE_ADDR = [ 0x80, 0xC0 ]
 
-class HD44780(BaseLCD):
-	"""Handle LCD with Hitachi HD44780 chip in 4 bit parallel mode.  The default
-	pins are (in BCM numbering):
-  LCD   GPIO (BCM)
-  ---   ----------
+class HD44780OPiH616(BaseLCD):
+	"""Handle LCD with Hitachi HD44780 chip in 4 bit parallel mode which attachs
+	to an OrangePi H616 board (such as Zero2). The default wiring scheme is (in 
+	physical numbering):
+  LCD   GPIO (Physical)
+  ---   ---------------
   VDD - +5V
   VSS - Ground
   V0  - Pin 3 (possitive) of a 10kΩ potentionmeter 
-  RS  - 17
+  RS  - 26
   RW  - Ground (to write data)
-  E   - 27
+  E   - 24
   D4  - 22
-  D5  - 5
-  D6  - 6
-  D7  - 26
-	A   - 16 (backlight anode) 
+  D5  - 18
+  D6  - 16
+  D7  - 12
+	A   - 10 (backlight anode) 
 	K   - Ground (backlight kathode)
 	"""
 
-	def __init__(self, rs = 17, e = 27, bla = 16, 
-			d4 = 22, d5 = 5, d6 = 6, d7 = 26):
+	def __init__(self, rs = 26, e = 24, bla = 10, 
+			d4 = 22, d5 = 18, d6 = 16, d7 = 12):
 		super().__init__(driver = "HD44780", 
 				e = e, rs = rs, bla = bla, d4 = d4, d5 = d5, d6 = d6, d7 = d7,
 				columns = 16, lines = 2)
+		GPIO.setboard(GPIO.H616)
 		GPIO.setwarnings(False)
-		GPIO.setmode(GPIO.BCM)
+		GPIO.setmode(GPIO.BOARD)
 		GPIO.setup(self._e, GPIO.OUT)
 		GPIO.setup(self._rs, GPIO.OUT)
 		GPIO.setup(self._d4, GPIO.OUT)
@@ -59,8 +61,7 @@ class HD44780(BaseLCD):
 		GPIO.output(self._d7, nibble & 0b1000 != 0)
 
 	def _sendByte(self, byte, mode):
-		"""Send one byte to the LCD. mode GPIO.HIGH for character, GPIO.LOW for 
-		command."""
+		"""Send one byte to the LCD. mode True for character, False for command."""
 		GPIO.output(self._rs, mode)
 		# High 4 bits.
 		self._sendNibble(byte >> 4)
