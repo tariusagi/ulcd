@@ -13,7 +13,7 @@ Syntax: {PROGRAM} [OPTION] [TEXT]
 OPTION:
 -B      Turn backlight on.
 -b      Turn backlight off.
--d      Run a demo (if supported). This ignore all other options.
+-d op   Run a demo with option op (default "all") and ignore all other options.
 -h      Display this help and exit.
 -i      Initialize/reset LCD (effectively clear the screen).
 -p      Print LCD parameters.
@@ -30,7 +30,7 @@ def main():
 	init = False
 	backlight = None
 	clear = False
-	demo = False
+	demo = None
 	printParams = False
 	line = 1
 	col = 1
@@ -43,7 +43,7 @@ def main():
 		sys.exit(0)
 	# Handle commandline arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], 'bBc:dhil:prt:x')
+		opts, args = getopt.getopt(sys.argv[1:], 'bBc:d:hil:prt:x')
 	except getopt.error as err:
 		print(f'ERROR: {str(err)}. Use "-h" for usage.', file = sys.stderr)
 		sys.exit(1)
@@ -59,7 +59,7 @@ def main():
 		elif o == '-c':
 			col = int(v)
 		elif o == '-d':
-			demo = True
+			demo = v
 		elif o == '-i':
 			init = True
 		elif o == '-l':
@@ -101,7 +101,7 @@ def main():
 		if printParams:
 			lcd.printParams()
 		if demo:
-			lcd.demo()
+			lcd.demo(option = demo)
 			sys.exit(0)
 		if init:
 			lcd.init()

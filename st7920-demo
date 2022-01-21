@@ -362,6 +362,38 @@ def main():
 		printStringTextMode("Interface: SPI",0,2)
 		printStringTextMode("Code: Python 3",0,3)
 		sys.exit(0)
+	elif sys.argv[1] == "8x8":
+		init()
+		clearDisplay(0)
+		initGraphicMode()
+		printStringGraphicMode("0123456789abcABC,./;'-=",0,0)
+		#  lines=(
+				#  "3x5 font 128x64 LCD demo",
+				#  "0123456789-_=+,<.>/?;:'\"",
+				#  "abcdefghijklmnopqrstuvwxyz",
+				#  "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+				#  )
+		#  y=0
+		#  for l in lines:
+			#  printString3x5(l,0,y, use_memPlot = 0)
+			#  y += 6
+		sys.exit(0)
+	elif sys.argv[1] == "3x5":
+		init()
+		clearDisplay(0)
+		initGraphicMode()
+		printString3x5("0123456789abcABC,./;'-=",0,0, use_memPlot = 0)
+		#  lines=(
+				#  "3x5 font 128x64 LCD demo",
+				#  "0123456789-_=+,<.>/?;:'\"",
+				#  "abcdefghijklmnopqrstuvwxyz",
+				#  "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+				#  )
+		#  y=0
+		#  for l in lines:
+			#  printString3x5(l,0,y, use_memPlot = 0)
+			#  y += 6
+		sys.exit(0)
 	elif sys.argv[1] != "all":
 		print("ERROR: Unknown option. Use \"all\" for a full demonstration.",
 				file = sys.stderr);
@@ -1245,13 +1277,16 @@ def loadBMP12864(imageRelativePath):
 # 1-point display / deletion / inversion at posX coordinates (0 to 127) and posY (0 to 63)
 def plot(posX, posY, style = 1):
 
-	# Checking for the correct range of coordinates and optionally adjusting them to the extreme values
-	# You can comment these, if you sure your program won't need them. It speeds the code a little
-	if (posX > 127): posX = 127
-	elif (posX < 0	): posX = 0
-	if (posY > 63 ): posY = 63
-	elif (posY < 0	): posY = 0
+	# Keep X and Y within 128x64 range.
+	if posX > 127:
+		posX = 127
+	elif posX < 0:
+		posX = 0
 
+	if posY > 63:
+		posY = 63
+	elif posY < 0:
+		posY = 0
 
 	horiz = posX // 16 # Same as / 16
 	if (posY >= 32):
@@ -1400,10 +1435,12 @@ def clearDisplay(pattern=0):
 #==============================================================
 # Set the display to the graphic mode
 def initGraphicMode():	
-	sendByte(0, 0b00110010)  # function set (8 bit)
-	sendByte(0, 0b00110110)  # function set (extend instruction set)
-	sendByte(0, 0b00110110)  # function set (graphic ON)
-	sendByte(0, 0b00000010)  # nable CGRAM after being reset to BASIC instruction set
+	#  sendByte(0, 0b00110010)  # function set (8 bit)
+	#  sendByte(0, 0b00110110)  # function set (extend instruction set)
+	#  sendByte(0, 0b00110110)  # function set (graphic ON)
+	#  sendByte(0, 0b00000010)  # nable CGRAM after being reset to BASIC instruction set
+	sendByte(0, 0b00110110)  # Turn on graphic display.
+	sendByte(0, 0b00000010)  # Enable CGRAM access.
 
 
 
