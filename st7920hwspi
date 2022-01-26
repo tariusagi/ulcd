@@ -64,7 +64,7 @@ def clear():
 
 def printText(text):
 	"""Print the given text at the current position"""
-	startData(72)
+	startData()
 	for c in text:
 		sendByte(ord(c))
 
