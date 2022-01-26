@@ -2,12 +2,21 @@
 import os
 from time import sleep
 import RPi.GPIO as GPIO
+import spidev
 from baselcd import BaseLCD
 from font3x5 import font3x5
 
-LCD_CMD = GPIO.LOW
-LCD_DATA = GPIO.HIGH
-E_DELAY=0
+# Serial transmission speed in Hz. Set to 1.93Mhz to be safe, but 15.6Mhz
+# (15600000Hz) tested working well on a Raspberry Pi Zero W.
+# on Raspberry Pi Zero W.
+SPI_SPEED = 1953000
+# Transmission modes: command and data.
+CMD = 0
+DATA = 1
+# Default text mode font settings.
+HCGFONT_MAX_LINES = 4
+HCGFONT_MAX_COLS = 16
+# FONT 3x5 settings.
 FONT3x5_MAX_LINES = 10
 FONT3x5_MAX_COLS = 32
 FONT3x5_WIDTH=3
@@ -23,7 +32,6 @@ class ST792012864SPI(BaseLCD):
 		RST = 25
 		BLA = 24
 	"""
-
 	# GDRAM buffer in memory. It has an address counter which point to the first
 	# of a 2-bytes pair. So if AC = 0 means byte 0, AC = 1 means byte 2. Each line
 	# has 128 dots, equal 16 bytes, so the AC range from 0 to 7. The AC will only
@@ -55,73 +63,54 @@ class ST792012864SPI(BaseLCD):
 	def _setRw(self, state):
 		GPIO.output(self._rw, state)
 
-	def _startTx(self, mode):
-		"""Start transmission. mode = 0 for command, 1 for data"""
-		# Transmission start with 5 "1" bits.
-		GPIO.output(self._rw, GPIO.HIGH)
-		self._pulse5()
-		# Then set the write direction ("0").
-		GPIO.output(self._rw, GPIO.LOW)
-		self._pulse()                                                                                  
-		# And select the register (mode).
-		GPIO.output(self._rw, mode)
-		self._pulse()
-		# Finally, a "0" bits.
-		GPIO.output(self._rw, GPIO.LOW)
-		self._pulse()
+	def _sendByte(self, byte, delay = 72):
+		"""Send one byte. If hw is True, then hardware mode will be used."""
+		# A byte is sent as a pair of bytes:
+		# - First byte contains the 4 MSB and 4 "0".
+		# - Second byte contains the 4 LSB and 4 "0".
+		if self._softClock:
+			# Use software generated clock by pulsing the E pin.
+			for i in range(7, 3, -1):
+				GPIO.output(self._rw, byte & (1 << i))
+				self._pulse()
+			GPIO.output(self._rw, GPIO.LOW)
+			self._pulse4()
+			for i in range(3, -1, -1):
+				GPIO.output(self._rw, byte & (1 << i))
+				self._pulse()
+			GPIO.output(self._rw, GPIO.LOW)
+			self._pulse4()
+		else:
+			# Use hardware clock.
+			self._spi.xfer2([0xF0 & byte, 0xF0 & (byte << 4)], SPI_SPEED, delay, 8)
 
-	def _sendByte(self, mode, byte, handshake = True):
-		"""Send one byte. mode = 0 for command, 1 for data"""
-		if handshake:
-			self._startTx(mode)
-		# Now send the high 4 bits.
-		for i in range(7, 3, -1):
-			GPIO.output(self._rw, byte & (1 << i))
-			self._pulse()
-		# Follows by 4 "0" bits.
-		GPIO.output(self._rw, GPIO.LOW)
-		self._pulse4()
-		# Send the low 4 bits.
-		for i in range(3, -1, -1):
-			GPIO.output(self._rw, byte & (1 << i))
-			self._pulse()
-		# End this byte transmission with 4 "0" bits.
-		GPIO.output(self._rw, GPIO.LOW)
-		self._pulse4()
+	def _send2Bytes(self, first, second, delay = 72):
+		"""Send 2 bytes at once without interruption between them."""
+		self._sendByte(first, delay)
+		self._sendByte(second, delay)
 
-	def _send2Bytes(self, mode, first, second, handshake = True):
-		"""Send 2 bytes at once without interruption between them. mode = 0 for 
-		command, 1 for data"""
-		if handshake:
-			self._startTx(mode)
-		# Send the first byte's high 4 bits.
-		for i in range(7, 3, -1):
-			GPIO.output(self._rw, first & (1 << i))
-			self._pulse()
-		# Follows by 4 "0" bits.
-		GPIO.output(self._rw, GPIO.LOW)
-		self._pulse4()
-		# Send the first byte's low 4 bits.
-		for i in range(3, -1, -1):    
-			GPIO.output(self._rw, first & (1 << i))
-			self._pulse()
-		# End this byte transmission with 4 "0" bits.
-		GPIO.output(self._rw, GPIO.LOW)
-		self._pulse4()
-		# Send the 2nd byte's high 4 bits.
-		for i in range(7, 3, -1):
-			GPIO.output(self._rw, second & (1 << i))
-			self._pulse()
-		# Follows by 4 "0" bits.
-		GPIO.output(self._rw, GPIO.LOW)
-		self._pulse4()
-		# Send the 2nd byte's low 4 bits.
-		for i in range(3, -1, -1):
-			GPIO.output(self._rw, second & (1 << i))
-			self._pulse()
-		# End this byte transmission with 4 "0" bits.
-		GPIO.output(self._rw, GPIO.LOW)
-		self._pulse4()
+	def _setMode(self, mode):
+		"""Start/switch transmission with mode = 0 for command, 1 for data"""
+		# A transmission begin with a start byte, which set the mode (register) of
+		# command or data, which consists of:
+		# - 5 "1" bits.
+		# - Direction bit: "0" for writing (this function), "1" for reading.
+		# - Register select bit: "0" for command, "1" for data.
+		# - 1 "0" bit.
+		if self._txMode != mode:
+			#  print(f"Start transmission mode {mode}")
+			self._txMode = mode
+			if self._softClock:
+				GPIO.output(self._rw, GPIO.HIGH)
+				self._pulse5()
+				GPIO.output(self._rw, GPIO.LOW)
+				self._pulse()
+				GPIO.output(self._rw, mode)
+				self._pulse()
+				GPIO.output(self._rw, GPIO.LOW)
+				self._pulse()
+			else:
+				self._spi.xfer2([0xF8 | (mode << 1)])
 
 	def _setTextModeCaret(self, line, col): 
 		"""Position text caret at the given line (1..4) and column (1..16)"""
@@ -134,7 +123,8 @@ class ST792012864SPI(BaseLCD):
 			addr = 0x98
 		if self._hcgrom:
 			addr += (col - 1) // 2
-		self._sendByte(LCD_CMD, addr)
+		self._setMode(CMD)
+		self._sendByte(addr)
 	
 	def backlight(self, state):
 		super().backlight(state)
@@ -146,54 +136,61 @@ class ST792012864SPI(BaseLCD):
 
 	def init(self): 
 		"""Initialize LCD hardware basic registers and operation mode"""
-		GPIO.output(self._rw, GPIO.LOW)
-		GPIO.output(self._e, GPIO.LOW)
-		GPIO.output(self._rst, GPIO.LOW)
-		sleep(E_DELAY)
-		GPIO.output(self._rst, GPIO.HIGH)
-		#
-		self._sendByte(LCD_CMD, 0b00110000)  # Function set (8 bit)
-		self._sendByte(LCD_CMD, 0b00110000)  # Basic instruction set
-		self._sendByte(LCD_CMD, 0b00001100)  # Display ON, cursor OFF, no blinking
-		self._sendByte(LCD_CMD, 0b10000000)  # Reset Address Counter
+		if self._softClock:
+			GPIO.output(self._rw, GPIO.LOW)
+			GPIO.output(self._e, GPIO.LOW)
+			GPIO.output(self._rst, GPIO.LOW)
+			GPIO.output(self._rst, GPIO.HIGH)
+		self._setMode(CMD)
+		self._sendByte(0x38)   # Basic function set (8 bit).
+		self._sendByte(0x0C)   # Display on, cursor off, blinkking off.
+		self._sendByte(0x06)   # No cursor or shift operation.
+		self._sendByte(0x01, 1600) # Clear screen and reset AC (need 1.6ms).
 
 	def setTextMode(self):	
 		if not self._textMode:
 			self._textMode = True
-			self._sendByte(LCD_CMD, 0b00110000)  # Function set (8 bit)
-			self._sendByte(LCD_CMD, 0b00110100)  # Extend instruction set
-			self._sendByte(LCD_CMD, 0b00110110)  # Graphic OFF
-			self._sendByte(LCD_CMD, 0b00110000)  # Basic instruction set
-			self._sendByte(LCD_CMD, 0b00000010)  # Enable CGRAM
-			self._sendByte(LCD_CMD, 0b00001100)  # Display ON, cursor OFF, no blinking
-			self._sendByte(LCD_CMD, 0b10000000)  # Reset Address Counter
+			self._maxLines = HCGFONT_MAX_LINES
+			self._maxCols = HCGFONT_MAX_COLS
+			self._setMode(CMD)
+			self._sendByte(0x30)  # Function set (8 bit)
+			self._sendByte(0x34)  # Extend instruction set
+			self._sendByte(0x36)  # Graphic OFF
+			self._sendByte(0x30)  # Basic instruction set
+			self._sendByte(0x02)  # Enable CGRAM
+			self._sendByte(0x0C)  # Display ON, cursor OFF, no blinking
+			self._sendByte(0x80)  # Reset AC.
 
 	def setGraphicMode(self):	
 		if self._textMode:
 			self._textMode = False
-			self._sendByte(LCD_CMD, 0b00110110)  # Turn on graphic display.
-			self._sendByte(LCD_CMD, 0b00000010)  # Enable CGRAM access.
+			self._setMode(CMD)
+			self._sendByte(0x36)  # Turn on graphic display.
+			self._sendByte(0x02)  # Enable CGRAM.
 
 	def clearScreen(self, pattern = 0): 
-		if self._textMode:
-			self._sendByte(LCD_CMD, 0b00000001)
+		if self._textMode: 
+			self._setMode(CMD)
+			self._sendByte(0x01, 1600)
 			self._textBuf = self._newTextBuf(16, 4)
 		else:
 			# Reset graphic mode text buffers.
 			self._3x5buf = self._newTextBuf(32, 10)
 			# Erase GDRAM, which effectively clear the display.
 			for y in range(64):
+				# Move AC.
+				self._setMode(CMD)
 				if y < 32:
 					# Set AC to firt column of the top half of the screen.
-					self._send2Bytes(LCD_CMD, 0x80 | y, 0x80)
+					self._send2Bytes(0x80 | y, 0x80)
 				else:
 					# Set AC to firt column of the bottom half of the screen.
-					self._send2Bytes(LCD_CMD, 0x80 | (y - 32), 0x88)
-				# Start hanshaking only once per line to save some speed.
-				self._startTx(LCD_DATA)
+					self._send2Bytes(0x80 | (y - 32), 0x88)
+				# Write data.
+				self._setMode(DATA)
 				for x in range(8):
 					# Write 16 bytes of each line. The AC auto-advance 2 bytes in a line.
-					self._send2Bytes(LCD_DATA, pattern, pattern, handshake = False)
+					self._send2Bytes(pattern, pattern)
 			# Erase memory buffer.
 			for y in range(64):
 				for x in range(16):
@@ -214,11 +211,15 @@ class ST792012864SPI(BaseLCD):
 		else:
 			first = self._mem[y][byteIndex]
 			second = self._mem[y][byteIndex + 1]
+		# Move AC.
+		self._setMode(CMD)
 		if y < 32:
-			self._send2Bytes(LCD_CMD, 0x80 | y, 0x80 | (byteIndex // 2))
+			self._send2Bytes(0x80 | y, 0x80 | (byteIndex // 2))
 		else:
-			self._send2Bytes(LCD_CMD, 0x80 | (y - 32), 0x88 | (byteIndex // 2))
-		self._send2Bytes(LCD_DATA, first, second)
+			self._send2Bytes(0x80 | (y - 32), 0x88 | (byteIndex // 2))
+		# Write data.
+		self._setMode(DATA)
+		self._send2Bytes(first, second)
 
 	def erase(self, x, y):
 		"""Erase a dot at x, y. Its bit is alway cleared to zero"""
@@ -232,11 +233,15 @@ class ST792012864SPI(BaseLCD):
 		else:
 			first = self._mem[y][byteIndex]
 			second = self._mem[y][byteIndex + 1]
+		# Move AC.
+		self._setMode(CMD)
 		if y < 32:
-			self._send2Bytes(LCD_CMD, 0x80 | y, 0x80 | (byteIndex // 2))
+			self._send2Bytes(0x80 | y, 0x80 | (byteIndex // 2))
 		else:
-			self._send2Bytes(LCD_CMD, 0x80 | (y - 32), 0x88 | (byteIndex // 2))
-		self._send2Bytes(LCD_DATA, first, second)
+			self._send2Bytes(0x80 | (y - 32), 0x88 | (byteIndex // 2))
+		# Write data.
+		self._setMode(DATA)
+		self._send2Bytes(first, second)
 
 	def printText(self, text, line = 1, col = 1, fillChar = ' '): 
 		"""Print a text at the given line and column. Missing character will be 
@@ -267,6 +272,7 @@ class ST792012864SPI(BaseLCD):
 			i = 0
 			hi = 0
 			lo = 0
+			self._setMode(DATA)
 			while i < l:
 				# NOTE: 8x16 font require 2 character in a single address.
 				if i == 0 and col % 2 == 0:
@@ -280,7 +286,8 @@ class ST792012864SPI(BaseLCD):
 					else:
 						lo = ord(self._textBuf[line - 1][col + i])
 					i += 2
-				self._send2Bytes(LCD_DATA, hi, lo)
+				self._setMode(DATA)
+				self._send2Bytes(hi, lo)
 
 	def printText3x5(self, text, line = 1, col = 1, fillChar = ' '):
 		if not self._textMode:
@@ -322,7 +329,11 @@ class ST792012864SPI(BaseLCD):
 			sleep(1.0)
 
 	def _demoGraphic(self):
+		# Clear text mode screen.
+		self.clearScreen()
+		# Switch to graphic mode.
 		self.setGraphicMode()
+		# Clear graphic mode screen.
 		self.clearScreen(0x00)
 		# 3x5 font demo.
 		line = 1
@@ -337,17 +348,16 @@ class ST792012864SPI(BaseLCD):
 		for s in texts:
 			self.printText3x5(s, line, col);
 			line += 1
-		sleep(3)
-		texts = [
-				"1 line of 3x5 font can contains",
-				"up to 32 letters and 10 lines"
-				]
-		line = 1
-		for s in texts:
-			self.printText3x5(s, line, col);
-			line += 1
-		sleep(3)
-		return
+		sleep(1)
+		#  texts = [
+				#  "1 line of 3x5 font can contains",
+				#  "up to 32 letters and 10 lines"
+				#  ]
+		#  line = 1
+		#  for s in texts:
+			#  self.printText3x5(s, line, col);
+			#  line += 1
+		#  sleep(1)
 		# Draw screen borders with 1 pixel width.
 		for x in range(128):
 			self.plot(x, 0)
@@ -374,7 +384,6 @@ class ST792012864SPI(BaseLCD):
 			sleep(3.0)
 			self.printText("Please wait...", line = 3)
 			sleep(0.5)
-			# Run a progress bar.
 			for i in range(16):
 				self.printText(">".rjust(i + 1, '='), line = 4)
 				sleep(0.1)
@@ -411,19 +420,31 @@ class ST792012864SPI(BaseLCD):
 			buf.append(' ' * width)
 		return buf
 
-	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24):
+	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24, softClock = False):
 		super().__init__(driver = "ST7290", e = e, rw = rw, rst = rst, bla = bla,
 				columns = 16, lines = 4, width = 128, height = 64)
+		self._softClock = softClock
+		self._txMode = None
 		GPIO.setwarnings(False)
 		GPIO.setmode(GPIO.BCM)
-		GPIO.setup(self._rw, GPIO.OUT)
-		GPIO.setup(self._e, GPIO.OUT)
+		if self._softClock:
+			print("Use soft clock.")
+			GPIO.setup(self._rw, GPIO.OUT)
+			GPIO.setup(self._e, GPIO.OUT)
 		GPIO.setup(self._rst, GPIO.OUT)
 		if self._bla is not None:
 			GPIO.setup(self._bla, GPIO.OUT)
+		# Instantiate the SPI object.
+		if not self._softClock:
+			self._spi = spidev.SpiDev()
+			self._spi.open(0, 0)
+			self._spi.max_speed_hz = SPI_SPEED
+			self._spi.cshigh = True
 		# Default to text mode with 8x16 HCGROM font, 4 lines, 16 letters width.
 		self._textMode = True
 		self._hcgrom = True
+		self._maxLines = HCGFONT_MAX_LINES
+		self._maxCols = HCGFONT_MAX_COLS
 		self._textBuf = self._newTextBuf(16, 4)
 		# Initialize 3x5 font buffer with 10 lines, 32 letters width.
 		self._3x5buf = self._newTextBuf(32, 10)

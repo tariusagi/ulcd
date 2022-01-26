@@ -15,11 +15,12 @@ Syntax: lcd [OPTION] [TEXT]
 OPTION:
 -B      Turn backlight on.
 -b      Turn backlight off.
--d      Run a demo (if supported). This ignore all other options.
+-d op   Run a demo with option op (default "all") and ignore all other options.
 -h      Display this help and exit.
 -i      Initialize/reset LCD (effectively clear the screen).
 -p      Print LCD parameters.
--t      LCD type. Supported type are hd44780, st7920. This is required.
+-s      Use software generated clock (default is using hardware).
+-t      LCD type (required). Supported type are hd44780, hd44780opi, st7920.
 -x      Clear the LCD screen.
 -r      Restore GPIO settings (default is not).
 -l n    Move text cursor to line n (start from 1, default 1).
@@ -119,7 +120,7 @@ LCD   GPIO (BCM)
 GND - Ground
 VCC - +5V
 VO  - +5V with 10K potentionmeter to adjust contrast
-RS  - +5V
+RS  - 8  (SPI0 CE0)
 R/W - 10 (SPI0 MOSI)
 E   - 11 (SPI0 SCLK)
 PSB - Ground (set SPI mode)
@@ -127,6 +128,8 @@ RST - 25
 BLA - 24
 BLK - Ground for backlight kathode
 ```
+
+Note that all 3 SPI pins MUST be set to ALT0 mode to use the hardware clock (spidev).
 
 If you don't want to control the backlight, just connect the BLA pin to a +5V 60mA, which let the backlight on all the time, or leave both BLA and BLK out to disable the backlight.
 
