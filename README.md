@@ -117,19 +117,18 @@ Wiring scheme:
 ```txt
 LCD   GPIO (BCM)
 ---   ----------
-GND - Ground
+GND - GND
 VCC - +5V
-VO  - +5V with 10K potentionmeter to adjust contrast
+VO  - (Optional) +5V with 10K potentionmeter to adjust contrast.
 RS  - 8  (SPI0 CE0)
 R/W - 10 (SPI0 MOSI)
 E   - 11 (SPI0 SCLK)
-PSB - Ground (set SPI mode)
-RST - 25
-BLA - 24
+PSB - GND (set SPI mode)
+BLA - +5V or default 24 to control blacklight
 BLK - Ground for backlight kathode
 ```
 
-Note that all 3 SPI pins MUST be set to ALT0 mode to use the hardware clock (spidev).
+Note that MOSI and SCLK pins be set to ALT0 mode, and SPI0 CE0 must be set to OUT HIGH to use the hardware clock (spidev).
 
 If you don't want to control the backlight, just connect the BLA pin to a +5V 60mA, which let the backlight on all the time, or leave both BLA and BLK out to disable the backlight.
 

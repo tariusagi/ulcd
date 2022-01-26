@@ -431,7 +431,7 @@ class ST792012864SPI(BaseLCD):
 			print("Use soft clock.")
 			GPIO.setup(self._rw, GPIO.OUT)
 			GPIO.setup(self._e, GPIO.OUT)
-		GPIO.setup(self._rst, GPIO.OUT)
+			GPIO.setup(self._rst, GPIO.OUT)
 		if self._bla is not None:
 			GPIO.setup(self._bla, GPIO.OUT)
 		# Instantiate the SPI object.
@@ -439,7 +439,7 @@ class ST792012864SPI(BaseLCD):
 			self._spi = spidev.SpiDev()
 			self._spi.open(0, 0)
 			self._spi.max_speed_hz = SPI_SPEED
-			self._spi.cshigh = True
+			self._spi.no_cs = True
 		# Default to text mode with 8x16 HCGROM font, 4 lines, 16 letters width.
 		self._textMode = True
 		self._hcgrom = True

@@ -85,7 +85,7 @@ def setCursor(line, col):
 spi = spidev.SpiDev()
 spi.open(0, 0)
 spi.max_speed_hz = SPI_SPEED
-spi.cshigh = True
+spi.no_cs = True
 spiWriteBytes = spi.xfer2
 init()
 printText("Loading... s")
