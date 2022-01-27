@@ -128,13 +128,34 @@ BLA - +5V or default 24 to control blacklight
 BLK - Ground for backlight kathode
 ```
 
-Note that MOSI and SCLK pins be set to ALT0 mode, and SPI0 CE0 must be set to OUT HIGH to use the hardware clock (spidev).
+Note that pin 10, 11 (MOSI, SCLK) pins MUST be set to ALT0 mode, and pin 8 (SPI0 CE0) must be set to ether ALT0 or OUT HIGH to use hardware clock SPI mode. The commands to set them are:
 
-If you don't want to control the backlight, just connect the BLA pin to a +5V 60mA, which let the backlight on all the time, or leave both BLA and BLK out to disable the backlight.
+```sh
+gpio -g mode 8 alt0
+gpio -g mode 10 alt0
+gpio -g mode 11 alt0
+```
+
+or
+
+```sh
+gpio -g mode 8 out
+gpio -g write 8 1
+gpio -g mode 10 alt0
+gpio -g mode 11 alt0
+```
+
+The later is what Raspberry Pi boot up with, so this module will just work.
+
+And if you don't want to control the backlight, just connect the BLA pin to a +5V (~60mA), which let the backlight on all the time, or leave both BLA and BLK out to disable the backlight.
+
+## st7920hwspi
+
+A Python 3 program to test the 128x64 ST7920 LCD in hardware SPI mode using spidev module. It just displays some texts in LCD's text mode.
 
 ## st7920-demo
 
-A Python 3 program to demonstrate the 128x64 ST7920 LCD. Running without argument to display a simple test or "all" to perform a full demonstration with texts, custom fonts and graphics.
+A Python 3 program to demonstrate the 128x64 ST7920 LCD in soft clock SPI mode. Running without argument to display a simple test or "all" to perform a full demonstration with texts, custom fonts and graphics.
 
 ## hd44780.py
 
