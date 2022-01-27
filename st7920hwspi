@@ -52,8 +52,8 @@ def startData(delay = 0):
 
 def init():
 	startCmd()
-	sendByte(0x38)   # Basic function set (8 bit).
-	sendByte(0x0C)   # Display on, cursor off, blinkking off.
+	sendByte(0x30)   # Basic function set (8 bit).
+	sendByte(0x0C)   # Display on, cursor off, blinking off.
 	sendByte(0x06)   # No cursor or shift operation.
 	sendByte(0x01, 1600) # Clear screen and reset AC (need 1.6ms to complete).
 
