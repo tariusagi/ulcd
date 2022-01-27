@@ -19,12 +19,16 @@ OPTION:
 -h      Display this help and exit.
 -i      Initialize/reset LCD (effectively clear the screen).
 -p      Print LCD parameters.
--s      Use software generated clock (default is using hardware).
--t      LCD type (required). Supported type are hd44780, hd44780opi, st7920.
+-t      LCD type (required). See supported types below.
 -x      Clear the LCD screen.
 -r      Restore GPIO settings (default is not).
 -l n    Move text cursor to line n (start from 1, default 1).
 -c n    Move text cursor to column n (if supported, start from 1, default 1).
+
+Supported LCD are:
+- st7920: 128x64 graphic LCD, ST7920 chip, 10 lines 32 characters, 3x5 font.
+- hd44780: 16x2 character LCD, HD44780 chip, 2 lines 16 characters, 5x8 font.
+- hd44780opi: it is hd44780 written for Orange Pi boards.
 ```
 
 ## lcdserver

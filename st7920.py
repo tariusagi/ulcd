@@ -3,6 +3,8 @@ import os
 from time import sleep
 import RPi.GPIO as GPIO
 import spidev
+import pprint
+import copy
 from baselcd import BaseLCD
 from font3x5 import font3x5
 
@@ -10,21 +12,26 @@ from font3x5 import font3x5
 # (15600000Hz) tested working well on a Raspberry Pi Zero W.
 # on Raspberry Pi Zero W.
 SPI_SPEED = 1953000
+# Default delay between writes to LCD's internal RAM (in microsecond).
+WRITE_DELAY = 72
 # Transmission modes: command and data.
 CMD = 0
 DATA = 1
 # Default text mode font settings.
-HCGFONT_MAX_LINES = 4
-HCGFONT_MAX_COLS = 16
+FONT8x16_LINES = 4
+FONT8x16_COLS = 16
+# Graphic mode settings.
+WIDTH = 128
+HEIGHT = 64
 # FONT 3x5 settings.
-FONT3x5_MAX_LINES = 10
-FONT3x5_MAX_COLS = 32
+FONT3x5_LINES = 10
+FONT3x5_COLS = 32
 FONT3x5_WIDTH=3
 FONT3x5_HEIGHT=5
 FONT3x5_VSPACE=1
 FONT3x5_HSPACE=1
 
-class ST792012864SPI(BaseLCD):
+class ST7920HSPI(BaseLCD):
 	"""Handle LCD with Sitronix ST7290 chip in SPI mode.  The default pins are 
 	(in BCM numbering):
 		E   = 11
@@ -43,8 +50,10 @@ class ST792012864SPI(BaseLCD):
 	# - If y = 0..31: y address set start at 0x80 + y, x (AC) start at 0x80.
 	# - If y = 32..63: y address start at 0x80 + (y - 32), AC start at 0x88.
 	#
-	# The buffer is set up as a matrix of 64 lines of 16 bytes.
-	_mem = []
+	# The buffer is set up as a matrix of 64 lines of 17 bytes. The last byte
+	# is the indicator byte, each bit represent a pair of bytes that contain 
+	# changes in the line, from MSB (first pair) to LSB (last pair).
+	_gfxBuf = []
 
 	def _pulse(self):
 		GPIO.output(self._e, GPIO.HIGH)
@@ -63,29 +72,15 @@ class ST792012864SPI(BaseLCD):
 	def _setRw(self, state):
 		GPIO.output(self._rw, state)
 
-	def _sendByte(self, byte, delay = 72):
-		"""Send one byte. If hw is True, then hardware mode will be used."""
+	def _sendByte(self, byte, delay = WRITE_DELAY):
+		"""Send one byte. Note that ST7920 requires 72us delay after each write."""
 		# A byte is sent as a pair of bytes:
 		# - First byte contains the 4 MSB and 4 "0".
 		# - Second byte contains the 4 LSB and 4 "0".
-		if self._softClock:
-			# Use software generated clock by pulsing the E pin.
-			for i in range(7, 3, -1):
-				GPIO.output(self._rw, byte & (1 << i))
-				self._pulse()
-			GPIO.output(self._rw, GPIO.LOW)
-			self._pulse4()
-			for i in range(3, -1, -1):
-				GPIO.output(self._rw, byte & (1 << i))
-				self._pulse()
-			GPIO.output(self._rw, GPIO.LOW)
-			self._pulse4()
-		else:
-			# Use hardware clock.
-			self._spi.xfer2([0xF0 & byte, 0xF0 & (byte << 4)], SPI_SPEED, delay, 8)
+		self._spi.xfer2([0xF0 & byte, 0xF0 & (byte << 4)], SPI_SPEED, delay, 8)
 
-	def _send2Bytes(self, first, second, delay = 72):
-		"""Send 2 bytes at once without interruption between them."""
+	def _send2Bytes(self, first, second, delay = WRITE_DELAY):
+		"""Send 2 bytes. This is for convenience."""
 		self._sendByte(first, delay)
 		self._sendByte(second, delay)
 
@@ -100,17 +95,7 @@ class ST792012864SPI(BaseLCD):
 		if self._txMode != mode:
 			#  print(f"Start transmission mode {mode}")
 			self._txMode = mode
-			if self._softClock:
-				GPIO.output(self._rw, GPIO.HIGH)
-				self._pulse5()
-				GPIO.output(self._rw, GPIO.LOW)
-				self._pulse()
-				GPIO.output(self._rw, mode)
-				self._pulse()
-				GPIO.output(self._rw, GPIO.LOW)
-				self._pulse()
-			else:
-				self._spi.xfer2([0xF8 | (mode << 1)])
+			self._spi.xfer2([0xF8 | (mode << 1)])
 
 	def _setTextModeCaret(self, line, col): 
 		"""Position text caret at the given line (1..4) and column (1..16)"""
@@ -125,7 +110,67 @@ class ST792012864SPI(BaseLCD):
 			addr += (col - 1) // 2
 		self._setMode(CMD)
 		self._sendByte(addr)
+
+	def _sendBlock(self, line, y, start, count):
+		# Move AC.
+		self._setMode(CMD)
+		self._send2Bytes(0x80 + (y % 32), 0x80 + (8 if y >= 32 else 0) + start,
+				delay = 0)
+		self._setMode(DATA)
+		for i in range(count):
+			self._send2Bytes(line[2 * (start + i)], line[2 * (start + i) + 1],
+					delay = 0)
+
+	def _sendLine(self, y):
+		"""Send the whole line at y to the LCD."""
+		# Check the whole dirty flag first.
+		if self._gfxBuf[y][16] == 0:
+			# This line is clean? Nothing to do.
+			return
+		# Create a short alias (reference).
+		buf = self._gfxBuf
+		flag = buf[y][16]
+		# Calculate range of data to send.
+		if self._debug:
+			debugMsg = ""
+		start = None
+		for i in range(8):
+			if flag & (0x80 >> i):
+				# Mark the start of a new (dirty) block.
+				if start is None:
+					start = i
+					count = 1
+				else:
+					# Extend current block.
+					count += 1
+				if i == 7:
+					# Last bit? Send this last block.
+					if self._debug:
+						debugMsg += "(last)%d:%d " % (start, count)
+					self._sendBlock(buf[y], y, start, count) 
+			elif start is not None:
+				# End of a block? Send it!
+				if self._debug:
+					debugMsg += "%d:%d " % (start, count)
+				self._sendBlock(buf[y], y, start, count) 
+				# Reset block marker.
+				start = None
+		if self._debug:
+			print("%02d: %s flag %s blocks %s" % 
+					(y, ' '.join(map(lambda n: format(n, "08b"), buf[y][0:16])),
+						format(flag, "08b"),
+						debugMsg))
+		# Clear dirty bits.
+		buf[y][16] = 0
 	
+	def _fillTextLine(self, text, col, maxCols, fillChar):
+		# Trim text longer than display.
+		if col > 1:
+			text = text.rjust(col + len(text) - 1, fillChar)
+		if len(text) < maxCols:
+			text = text.ljust(maxCols, fillChar)
+		return text
+
 	def backlight(self, state):
 		super().backlight(state)
 		if self._bla is not None:
@@ -136,129 +181,87 @@ class ST792012864SPI(BaseLCD):
 
 	def init(self): 
 		"""Initialize LCD hardware basic registers and operation mode"""
-		if self._softClock:
-			GPIO.output(self._rw, GPIO.LOW)
-			GPIO.output(self._e, GPIO.LOW)
-			GPIO.output(self._rst, GPIO.LOW)
-			GPIO.output(self._rst, GPIO.HIGH)
 		self._setMode(CMD)
-		self._sendByte(0x38)   # Basic function set (8 bit).
-		self._sendByte(0x0C)   # Display on, cursor off, blinkking off.
-		self._sendByte(0x06)   # No cursor or shift operation.
+		self._sendByte(0x30) # Basic function set (8 bit).
+		self._sendByte(0x0C) # Display on, cursor off, blinking off.
+		self._sendByte(0x06) # No cursor or shift operation.
+		self._sendByte(0x02) # Enable CGRAM for user-defined font.
 		self._sendByte(0x01, 1600) # Clear screen and reset AC (need 1.6ms).
 
 	def setTextMode(self):	
 		if not self._textMode:
 			self._textMode = True
-			self._maxLines = HCGFONT_MAX_LINES
-			self._maxCols = HCGFONT_MAX_COLS
 			self._setMode(CMD)
-			self._sendByte(0x30)  # Function set (8 bit)
-			self._sendByte(0x34)  # Extend instruction set
-			self._sendByte(0x36)  # Graphic OFF
-			self._sendByte(0x30)  # Basic instruction set
-			self._sendByte(0x02)  # Enable CGRAM
-			self._sendByte(0x0C)  # Display ON, cursor OFF, no blinking
-			self._sendByte(0x80)  # Reset AC.
+			self._sendByte(0x34) # Extend instruction set
+			self._sendByte(0x34) # Graphic OFF
+			self._sendByte(0x30) # Basic instruction set
+			self._sendByte(0x02) # Enable CGRAM for user-defined font.
+			self._sendByte(0x0C) # Display ON, cursor OFF, no blinking
+			self._sendByte(0x80) # Reset AC.
 
 	def setGraphicMode(self):	
 		if self._textMode:
 			self._textMode = False
 			self._setMode(CMD)
-			self._sendByte(0x36)  # Turn on graphic display.
-			self._sendByte(0x02)  # Enable CGRAM.
+			self._sendByte(0x34) # Extend instruction set
+			self._sendByte(0x36) # Turn on graphic display.
 
 	def clearScreen(self, pattern = 0): 
+		"""Clear the entire screen, both text and graphic mode."""
 		if self._textMode: 
 			self._setMode(CMD)
 			self._sendByte(0x01, 1600)
-			self._textBuf = self._newTextBuf(16, 4)
+			self._textBuf = self._newTextBuf(FONT8x16_LINES, FONT8x16_COLS)
 		else:
 			# Reset graphic mode text buffers.
-			self._3x5buf = self._newTextBuf(32, 10)
-			# Erase GDRAM, which effectively clear the display.
+			self._3x5buf = self._newTextBuf(FONT3x5_LINES, FONT3x5_COLS)
+			# Reset internal graphic buffer.
+			self._gfxBuf = [[pattern] * 17 for i in range(64)]
+			# Mark all lines dirty.
 			for y in range(64):
-				# Move AC.
-				self._setMode(CMD)
-				if y < 32:
-					# Set AC to firt column of the top half of the screen.
-					self._send2Bytes(0x80 | y, 0x80)
-				else:
-					# Set AC to firt column of the bottom half of the screen.
-					self._send2Bytes(0x80 | (y - 32), 0x88)
-				# Write data.
-				self._setMode(DATA)
-				for x in range(8):
-					# Write 16 bytes of each line. The AC auto-advance 2 bytes in a line.
-					self._send2Bytes(pattern, pattern)
-			# Erase memory buffer.
-			for y in range(64):
-				for x in range(16):
-					self._mem[y][x] = pattern
+				self._gfxBuf[y][16] = 0xFF
 
-	def plot(self, x, y, inverted = True):
-		"""Plot a dot at x, y"""
+	def plot(self, x, y, inverted = False):
+		"""Plot a dot at x, y. If inverted = True, then the dot will be inverted."""
 		if (x > 127) or (y > 63):
 			return
 		byteIndex = x // 8
+		# Mark dirty bit.
+		self._gfxBuf[y][16] |= 0x80 >> (byteIndex // 2)
+		# Process pixel bit.
 		if inverted:
-			self._mem[y][byteIndex] ^= 0x80 >> (x % 8)
+			self._gfxBuf[y][byteIndex] ^= 0x80 >> (x % 8)
 		else:
-			self._mem[y][byteIndex] |= 0x80 >> (x % 8)
-		if byteIndex % 2:
-			first = self._mem[y][byteIndex - 1]
-			second = self._mem[y][byteIndex]
-		else:
-			first = self._mem[y][byteIndex]
-			second = self._mem[y][byteIndex + 1]
-		# Move AC.
-		self._setMode(CMD)
-		if y < 32:
-			self._send2Bytes(0x80 | y, 0x80 | (byteIndex // 2))
-		else:
-			self._send2Bytes(0x80 | (y - 32), 0x88 | (byteIndex // 2))
-		# Write data.
-		self._setMode(DATA)
-		self._send2Bytes(first, second)
+			self._gfxBuf[y][byteIndex] |= 0x80 >> (x % 8)
 
 	def erase(self, x, y):
-		"""Erase a dot at x, y. Its bit is alway cleared to zero"""
+		"""Erase a dot at x, y (its bit will always be set to zero)."""
 		if (x > 127) or (y > 63):
 			return
 		byteIndex = x // 8
-		self._mem[y][byteIndex] &= ~(0x80 >> (x % 8))
-		if byteIndex % 2:
-			first = self._mem[y][byteIndex - 1]
-			second = self._mem[y][byteIndex]
-		else:
-			first = self._mem[y][byteIndex]
-			second = self._mem[y][byteIndex + 1]
-		# Move AC.
-		self._setMode(CMD)
-		if y < 32:
-			self._send2Bytes(0x80 | y, 0x80 | (byteIndex // 2))
-		else:
-			self._send2Bytes(0x80 | (y - 32), 0x88 | (byteIndex // 2))
-		# Write data.
-		self._setMode(DATA)
-		self._send2Bytes(first, second)
+		# Mark dirty bit.
+		self._gfxBuf[y][16] |= 0x80 >> (byteIndex // 2)
+		# Process pixel bit.
+		self._gfxBuf[y][byteIndex] &= ~(0x80 >> (x % 8))
+
+	def redraw(self):
+		"""Redraw the screen by sending changed lines to the LCD."""
+		for y in range(64):
+			self._sendLine(y)
 
 	def printText(self, text, line = 1, col = 1, fillChar = ' '): 
 		"""Print a text at the given line and column. Missing character will be 
 		filled with fillChar, default is space. If fillChar is None, then the text
 		will be printed as-is"""
-		if line < 1 or line > self._maxLines or col < 1 or col > self._maxCols:
+		if line < 1 or line > FONT8x16_LINES or col < 1 or col > FONT8x16_COLS:
 			# Ignore invalid position.
 			return
-		# Trim text longer than 16 characters.
 		if fillChar is not None:
-			if col > 1:
-				text = text.rjust(col + len(text) - 1, fillChar)
-			if len(text) < self._maxCols:
-				text = text.ljust(self._maxCols, fillChar)
+			text = self._fillTextLine(text, col, FONT8x16_COLS, fillChar)
 			col = 1
-		if (len(text) + col - 1 > self._maxCols):
-			text = text[0:self._maxCols - col + 1]
+		# Trim text longer than display.
+		if (len(text) + col - 1 > FONT8x16_COLS):
+			text = text[0:FONT8x16_COLS - col + 1]
 		# Merge into text buffer.
 		s = list(self._textBuf[line - 1])
 		for i in range(len(text)):
@@ -290,32 +293,41 @@ class ST792012864SPI(BaseLCD):
 				self._send2Bytes(hi, lo)
 
 	def printText3x5(self, text, line = 1, col = 1, fillChar = ' '):
-		if not self._textMode:
-			self._maxLines = FONT3x5_MAX_LINES
-			self._maxCols = FONT3x5_MAX_COLS
-			plotX = (col - 1) * (FONT3x5_WIDTH + FONT3x5_HSPACE)
-			plotY = (line - 1) * (FONT3x5_HEIGHT + FONT3x5_VSPACE)
-			for char in text:
-				char = ord(char)
-				if (32 > char or char > 126):
-					char = 127
-				# Our font set starts at ASCII 32.
-				char -= 32
-				# Now draw the character.
-				for column in range(len(font3x5[char])):
-					for row in range(len(font3x5[char][column])):
-						if font3x5[char][column][row]:
-							self.plot(plotX, plotY + row, inverted = False)
-						else:
-							self.erase(plotX, plotY + row)
-					if column == len(font3x5[char]) - 1:
-						# Leave a blank vertical line between characters.
-						self.erase(plotX + 1, plotY + row)
-						plotX += 2 * FONT3x5_HSPACE
+		if self._textMode:
+			return
+		if line < 1 or line > FONT3x5_LINES or col < 1 or col > FONT3x5_COLS:
+			# Ignore invalid position.
+			return
+		if fillChar is not None:
+			text = self._fillTextLine(text, col, FONT3x5_COLS, fillChar)
+			col = 1
+		# Trim text longer than display.
+		if (len(text) + col - 1 > FONT3x5_COLS):
+			text = text[0:FONT3x5_COLS - col + 1]
+		# Draw characters on gfx buffer.
+		x = (col - 1) * (FONT3x5_WIDTH + FONT3x5_HSPACE)
+		y = (line - 1) * (FONT3x5_HEIGHT + FONT3x5_VSPACE)
+		for char in text:
+			char = ord(char)
+			# Set error for out of range.
+			if (32 > char or char > 126):
+				char = 127
+			# The font set starts at ASCII 32 (space).
+			char -= 32
+			# Draw the character.
+			for c in range(FONT3x5_WIDTH):
+				for r in range(FONT3x5_HEIGHT):
+					if font3x5[char][c][r]:
+						self.plot(x + c, y + r, inverted = False)
 					else:
-						plotX += 1
+						self.erase(x + c, y + r)
+					if c == FONT3x5_WIDTH - 1:
+						# Last column? Leave a blank vertical line after.
+						self.erase(x + c + 1, y + r)
+			# Prepare to draw next character.
+			x += FONT3x5_WIDTH + FONT3x5_HSPACE
 
-	def clearLine(self, line):
+	def clearTextLine(self, line):
 		if self._textMode:
 			self.printText('', line = line)
 			# Clear text buffer.
@@ -328,36 +340,56 @@ class ST792012864SPI(BaseLCD):
 			self.printText(str(i), line = 4, col = 11, fillChar = None)
 			sleep(1.0)
 
-	def _demoGraphic(self):
-		# Clear text mode screen.
+	def _demoCountdown3x5(self, duration = 3, init = False):
+		if init:
+			self.printText3x5("Next in  s", line = 4, col = 3)
+			self.redraw()
+		for i in range(duration, 0, -1):
+			self.printText3x5(str(i), line = 4, col = 11, fillChar = None)
+			self.redraw()
+			sleep(1.0)
+
+	def _demo3x5(self):
 		self.clearScreen()
-		# Switch to graphic mode.
 		self.setGraphicMode()
-		# Clear graphic mode screen.
-		self.clearScreen(0x00)
-		# 3x5 font demo.
-		line = 1
-		col = 1
-		texts = [
-				"3x5 font demo with 1px spaces ",
-				"between letters and lines",
-				"0123456789ABCDEFGHIJKLMNOPQRSTUV",
-				"WXYZ,./<>?;':\"[]{}\|-=_+~!@#$%^&",
-				"*() and a space at the end."
-				]
-		for s in texts:
-			self.printText3x5(s, line, col);
-			line += 1
-		sleep(1)
-		#  texts = [
-				#  "1 line of 3x5 font can contains",
-				#  "up to 32 letters and 10 lines"
-				#  ]
-		#  line = 1
-		#  for s in texts:
-			#  self.printText3x5(s, line, col);
-			#  line += 1
-		#  sleep(1)
+		self.clearScreen(0)
+		self.redraw()
+		sleep(0.5)
+		#3x5 font ruler:  "--------------------------------"
+		self.printText3x5("The AMAZING 3x5 font demo!")
+		self.printText3x5("This is a custom font in graphic", line = 2)
+		self.printText3x5("mode with 3px width, 5px height.", line = 3)
+		self.redraw()
+		sleep(1.0)
+		self.printText3x5("Please wait...", line = 3)
+		self.redraw()
+		sleep(0.5)
+		for i in range(FONT3x5_COLS):
+			self.printText3x5(">".rjust(i + 1, '='), line = 4)
+			self.redraw()
+			sleep(0.05)
+		self.printText3x5("Numbers:", line = 1)
+		self.printText3x5("0123456789-+=<>/", line = 2)
+		self.printText3x5("~!@#$%^&*()_,.;?", line = 3)
+		self.redraw()
+		self._demoCountdown3x5(init = True)
+		self.printText3x5("Lower cases:", line = 1)
+		self.printText3x5("abcdefghijklmnop", line = 2);
+		self.printText3x5("qrstuvwxyz", line = 3)
+		self.redraw()
+		self._demoCountdown3x5(5)
+		self.printText3x5("Upper cases:", line = 1)
+		self.printText3x5("ABCDEFGHIJKLMNOP", line = 2);
+		self.printText3x5("QRSTUVWXYZ", line = 3)
+		self.redraw()
+		self._demoCountdown3x5(5)
+
+	def _demoGraphic(self):
+		self.clearScreen()
+		self.setGraphicMode()
+		self.clearScreen(0)
+		self.redraw()
+		sleep(0.5)
 		# Draw screen borders with 1 pixel width.
 		for x in range(128):
 			self.plot(x, 0)
@@ -367,10 +399,13 @@ class ST792012864SPI(BaseLCD):
 			self.plot(x, 63)
 		for y in range(62, 0, -1):
 			self.plot(0, y)
+		self.redraw()
 		# Draw diagonal lines.
 		for x in range(128):
 				self.plot(x, x // 2)
 				self.plot(127 - x, x // 2)
+		self.redraw()
+		sleep(1)
 
 	def demo(self, option = "all"):
 		self.init()
@@ -381,12 +416,12 @@ class ST792012864SPI(BaseLCD):
 			self.printText("ST7920 demo:")
 			self.printText("The default 8x16", line = 2)
 			self.printText("font text mode", line = 3)
-			sleep(3.0)
+			sleep(1.0)
 			self.printText("Please wait...", line = 3)
 			sleep(0.5)
 			for i in range(16):
 				self.printText(">".rjust(i + 1, '='), line = 4)
-				sleep(0.1)
+				sleep(0.05)
 			self.printText("Numbers:", line = 1)
 			self.printText("0123456789-+=<>/", line = 2)
 			self.printText("~!@#$%^&*()_,.;?", line = 3)
@@ -401,8 +436,9 @@ class ST792012864SPI(BaseLCD):
 			self._demoCountdown()
 			self.clearScreen()
 			self.printText("To graphic mode", line = 1)
-			self._demoCountdown(init = True, duration = 5)
+			self._demoCountdown(init = True, duration = 3)
 			self._demoGraphic()
+			self._demo3x5()
 			self.setTextMode()
 			self.printText("Turn off in  s", line = 4, col = 2)
 			for i in range(3, 0, -1):
@@ -412,44 +448,31 @@ class ST792012864SPI(BaseLCD):
 			self.backlight(False)
 		elif option == "gfx":
 			self._demoGraphic()
+		elif option == "3x5":
+			self._demo3x5()
 
-	def _newTextBuf(self, width, lines):
+	def _newTextBuf(self, lines, width):
 		"""Return a space filled text buffer with given number of lines and width."""
-		buf = []
-		for i in range(lines):
-			buf.append(' ' * width)
+		buf = [[' '] * width for i in range(lines)]
 		return buf
 
-	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24, softClock = False):
+	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24):
 		super().__init__(driver = "ST7290", e = e, rw = rw, rst = rst, bla = bla,
 				columns = 16, lines = 4, width = 128, height = 64)
-		self._softClock = softClock
+		self._debug = False
 		self._txMode = None
 		GPIO.setwarnings(False)
 		GPIO.setmode(GPIO.BCM)
-		if self._softClock:
-			print("Use soft clock.")
-			GPIO.setup(self._rw, GPIO.OUT)
-			GPIO.setup(self._e, GPIO.OUT)
-			GPIO.setup(self._rst, GPIO.OUT)
 		if self._bla is not None:
 			GPIO.setup(self._bla, GPIO.OUT)
 		# Instantiate the SPI object.
-		if not self._softClock:
-			self._spi = spidev.SpiDev()
-			self._spi.open(0, 0)
-			self._spi.max_speed_hz = SPI_SPEED
-			self._spi.no_cs = True
+		self._spi = spidev.SpiDev()
+		self._spi.open(0, 0)
+		self._spi.max_speed_hz = SPI_SPEED
+		self._spi.no_cs = True
 		# Default to text mode with 8x16 HCGROM font, 4 lines, 16 letters width.
 		self._textMode = True
 		self._hcgrom = True
-		self._maxLines = HCGFONT_MAX_LINES
-		self._maxCols = HCGFONT_MAX_COLS
-		self._textBuf = self._newTextBuf(16, 4)
-		# Initialize 3x5 font buffer with 10 lines, 32 letters width.
-		self._3x5buf = self._newTextBuf(32, 10)
-		# Initialize the graphic bitmap (128x64) in memory buffer.
-		for y in range(64):
-			self._mem.append([])
-			for x in range(16):
-				self._mem[y].append(0)
+		self._textBuf = self._newTextBuf(FONT8x16_LINES, FONT8x16_COLS)
+		self._3x5buf = self._newTextBuf(FONT3x5_LINES, FONT3x5_COLS)
+		self._gfxBuf = [[0] * 17 for i in range(64)]

@@ -2,6 +2,7 @@
 import os
 import sys
 import getopt
+import subprocess
 from time import sleep
 
 VERSION = "0.1"
@@ -17,12 +18,16 @@ OPTION:
 -h      Display this help and exit.
 -i      Initialize/reset LCD (effectively clear the screen).
 -p      Print LCD parameters.
--s      Use software generated clock (default is using hardware).
--t      LCD type (required). Supported type are hd44780, hd44780opi, st7920.
+-t      LCD type (required). See supported types below.
 -x      Clear the LCD screen.
 -r      Restore GPIO settings (default is not).
 -l n    Move text cursor to line n (start from 1, default 1).
 -c n    Move text cursor to column n (if supported, start from 1, default 1).
+
+Supported LCD are:
+- st7920: 128x64 graphic LCD, ST7920 chip, 10 lines 32 characters, 3x5 font.
+- hd44780: 16x2 character LCD, HD44780 chip, 2 lines 16 characters, 5x8 font.
+- hd44780opi: it is hd44780 written for Orange Pi boards.
 """
 
 def main():
@@ -85,8 +90,11 @@ def main():
 		print('ERROR: Missing LCD type.', file = sys.stderr)
 		sys.exit(2)
 	elif lcdType == "st7920":
-		from st7920 import ST792012864SPI
-		lcd = ST792012864SPI(softClock = softClock)
+		subprocess.run(["gpio", "-g", "mode", "8", "alt0"])
+		subprocess.run(["gpio", "-g", "mode", "10", "alt0"])
+		subprocess.run(["gpio", "-g", "mode", "11", "alt0"])
+		from st7920 import ST7920HSPI
+		lcd = ST7920HSPI()
 	elif lcdType == "hd44780":
 		from hd44780 import HD44780
 		lcd = HD44780()
@@ -108,12 +116,26 @@ def main():
 			sys.exit(0)
 		if init:
 			lcd.init()
+			if lcdType == "st7920":
+				lcd.setGraphicMode()
+				lcd.clearScreen(0)
+				lcd.redraw()
 		if backlight is not None:
 			lcd.backlight(backlight)
 		if clear:
-			lcd.clearScreen()
+			if lcdType == "st7920":
+				lcd.setGraphicMode()
+				lcd.clearScreen(0)
+				lcd.redraw()
+			else:
+				lcd.clearScreen()
 		if len(text):
-			lcd.printText(text, line = line, col = col)
+			if lcdType == "st7920":
+				lcd.setGraphicMode()
+				lcd.printText3x5(text, line = line, col = col)
+				lcd.redraw()
+			else:
+				lcd.printText(text, line = line, col = col)
 		if cleanup:
 			lcd.cleanup()
  
