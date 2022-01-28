@@ -26,7 +26,7 @@ OPTION:
 -c n    Move text cursor to column n (if supported, start from 1, default 1).
 
 Supported LCD are:
-- st7920: 128x64 graphic LCD, ST7920 chip, 10 lines 32 characters, 3x5 font.
+- st7920: 128x64 graphic LCD, ST7920 chip, 8 lines 21 characters, 6x8 font.
 - hd44780: 16x2 character LCD, HD44780 chip, 2 lines 16 characters, 5x8 font.
 - hd44780opi: it is hd44780 written for Orange Pi boards.
 ```

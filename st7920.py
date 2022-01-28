@@ -5,6 +5,7 @@ import RPi.GPIO as GPIO
 import spidev
 import pprint
 import copy
+import png
 from baselcd import BaseLCD
 from font3x5 import font3x5
 
@@ -30,6 +31,13 @@ FONT3x5_WIDTH=3
 FONT3x5_HEIGHT=5
 FONT3x5_VSPACE=1
 FONT3x5_HSPACE=1
+# FONT 6x8 settings.
+FONT6x8_LINES = 8
+FONT6x8_COLS = 21
+FONT6x8_WIDTH=6
+FONT6x8_HEIGHT=8
+FONT6x8_VSPACE=0
+FONT6x8_HSPACE=0
 
 class ST7920HSPI(BaseLCD):
 	"""Handle LCD with Sitronix ST7290 chip in SPI mode.  The default pins are 
@@ -327,6 +335,39 @@ class ST7920HSPI(BaseLCD):
 			# Prepare to draw next character.
 			x += FONT3x5_WIDTH + FONT3x5_HSPACE
 
+	def printText6x8(self, text, line = 1, col = 1, fillChar = ' '):
+		if self._textMode:
+			return
+		if line < 1 or line > FONT6x8_LINES or col < 1 or col > FONT6x8_COLS:
+			# Ignore invalid position.
+			return
+		if fillChar is not None:
+			text = self._fillTextLine(text, col, FONT6x8_COLS, fillChar)
+			col = 1
+		# Trim text longer than display.
+		if (len(text) + col - 1 > FONT6x8_COLS):
+			text = text[0:FONT6x8_COLS - col + 1]
+		# Draw characters on gfx buffer.
+		x = (col - 1) * (FONT6x8_WIDTH + FONT6x8_HSPACE)
+		y = (line - 1) * (FONT6x8_HEIGHT + FONT6x8_VSPACE)
+		for c in text:
+			try:
+				font, cw, ch = self._fontSheet6x8
+				char = font[ord(c)]
+				sy = 0
+				for row in char:
+					sx = 0
+					for px in row:
+						if px:
+							self.plot(x + sx, y + sy)
+						else:
+							self.erase(x + sx, y + sy)
+						sx += 1
+					sy += 1
+			except KeyError:
+				pass
+			x += cw
+
 	def clearTextLine(self, line):
 		if self._textMode:
 			self.printText('', line = line)
@@ -346,6 +387,15 @@ class ST7920HSPI(BaseLCD):
 			self.redraw()
 		for i in range(duration, 0, -1):
 			self.printText3x5(str(i), line = 4, col = 11, fillChar = None)
+			self.redraw()
+			sleep(1.0)
+
+	def _demoCountdown6x8(self, duration = 3, init = False):
+		if init:
+			self.printText6x8("Next in  s", line = 4, col = 3)
+			self.redraw()
+		for i in range(duration, 0, -1):
+			self.printText6x8(str(i), line = 4, col = 11, fillChar = None)
 			self.redraw()
 			sleep(1.0)
 
@@ -383,6 +433,41 @@ class ST7920HSPI(BaseLCD):
 		self.printText3x5("QRSTUVWXYZ", line = 3)
 		self.redraw()
 		self._demoCountdown3x5(5)
+
+	def _demo6x8(self):
+		self.clearScreen()
+		self.setGraphicMode()
+		self.clearScreen(0)
+		self.redraw()
+		sleep(0.5)
+		#6x8 font ruler:  "---------------------"
+		self.printText6x8("The 6x8 font demo!")
+		self.printText6x8("A custom font in gfx", line = 2)
+		self.printText6x8("6px width, 8px height", line = 3)
+		self.redraw()
+		sleep(1.0)
+		self.printText6x8("Please wait...", line = 3)
+		self.redraw()
+		sleep(0.5)
+		for i in range(FONT6x8_COLS):
+			self.printText6x8(">".rjust(i + 1, '='), line = 4)
+			self.redraw()
+			sleep(0.05)
+		self.printText6x8("Numbers:", line = 1)
+		self.printText6x8("0123456789-+=<>/", line = 2)
+		self.printText6x8("~!@#$%^&*()_,.;?", line = 3)
+		self.redraw()
+		self._demoCountdown6x8(init = True)
+		self.printText6x8("Lower cases:", line = 1)
+		self.printText6x8("abcdefghijklmnop", line = 2);
+		self.printText6x8("qrstuvwxyz", line = 3)
+		self.redraw()
+		self._demoCountdown6x8(5)
+		self.printText6x8("Upper cases:", line = 1)
+		self.printText6x8("ABCDEFGHIJKLMNOP", line = 2);
+		self.printText6x8("QRSTUVWXYZ", line = 3)
+		self.redraw()
+		self._demoCountdown6x8(5)
 
 	def _demoGraphic(self):
 		self.clearScreen()
@@ -439,6 +524,7 @@ class ST7920HSPI(BaseLCD):
 			self._demoCountdown(init = True, duration = 3)
 			self._demoGraphic()
 			self._demo3x5()
+			self._demo6x8()
 			self.setTextMode()
 			self.printText("Turn off in  s", line = 4, col = 2)
 			for i in range(3, 0, -1):
@@ -450,11 +536,28 @@ class ST7920HSPI(BaseLCD):
 			self._demoGraphic()
 		elif option == "3x5":
 			self._demo3x5()
+		elif option == "6x8":
+			self._demo6x8()
 
 	def _newTextBuf(self, lines, width):
 		"""Return a space filled text buffer with given number of lines and width."""
 		buf = [[' '] * width for i in range(lines)]
 		return buf
+
+	def _loadFontSheet(self, filename, cw, ch):
+		img = png.Reader(filename).read()
+		rows = list(img[2])
+		height = len(rows)
+		width = len(rows[0])
+		sheet = []
+		for y in range(height//ch):
+			for x in range(width//cw):
+				char = []
+				for sy in range(ch):
+					row = rows[(y*ch)+sy]
+					char.append(row[(x*cw):(x+1)*cw])
+				sheet.append(char)
+		return (sheet, cw, ch)
 
 	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24):
 		super().__init__(driver = "ST7290", e = e, rw = rw, rst = rst, bla = bla,
@@ -473,6 +576,10 @@ class ST7920HSPI(BaseLCD):
 		# Default to text mode with 8x16 HCGROM font, 4 lines, 16 letters width.
 		self._textMode = True
 		self._hcgrom = True
+		self._gfxBuf = [[0] * 17 for i in range(64)]
 		self._textBuf = self._newTextBuf(FONT8x16_LINES, FONT8x16_COLS)
 		self._3x5buf = self._newTextBuf(FONT3x5_LINES, FONT3x5_COLS)
-		self._gfxBuf = [[0] * 17 for i in range(64)]
+		# Load 6x8 font from file.
+		path = os.path.abspath(__file__)
+		dirPath = os.path.dirname(path)
+		self._fontSheet6x8 = self._loadFontSheet(dirPath + "/font6x8.png", 6, 8)
