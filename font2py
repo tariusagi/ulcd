@@ -1,0 +1,214 @@
+#!/usr/bin/env python3
+"""Convert a font file to Python object."""
+VERSION = "0.1"
+DEBUG = False
+
+# Module imports.
+import os
+import sys
+import getopt
+import png
+import pprint
+
+# File name and path to this script.
+FILE = os.path.basename(__file__)
+PATH=os.path.dirname(os.path.abspath(__file__))
+
+# Program usage.
+USAGE = f"""\
+{FILE} version {VERSION} from {PATH}
+Syntax: {FILE} [OPTION] <file>
+Convert a monospace, bitmap font file to a Python object. 
+
+OPTION:
+  -h, --help                  Print this usage.
+  -d, --debug                 Enable debug messages to stderr.
+  -n, --name=string           Name of the Python font object (default "font").
+  -W, --width=num             (Required) Width of a character in pixels.
+  -H, --height=num            (Required) Height of a character in pixels.
+  -f, --first=num             (Required) First character code (ASCII).
+  -s, --size=num              Size of font table (number of characters). Default
+                              to maximum available from the input file.
+  -k, --skip=num              Skip first num of characters.
+
+This program will print to stdout a Python source module, with comments telling
+the font's attributes, the font object itself, and a small code to pretty print
+the font object itself should the module be executed as a standalone program.
+The font object is a Python dict, which consists of:
+- width: character width.
+- height: character height.
+- first: the first character (ASCII) code in the bitmap.
+- size: total number of characters in the bitmap.
+- bitmap: a dict of characters' bitmaps, with keys are the characters' ASCII
+code itself. Each value is a list of rows, each row is a list of bytes, 
+each byte represent 8 bits of that character's bitmap, up to "width" number
+of bits.
+"""
+
+def bits(byte, digits = True):
+	s = ''
+	for i in range(8):
+		if byte & (0x80 >> i):
+			s += '1' if digits else 'X'
+		else:
+			s += '0' if digits else '.'
+	return s
+
+def loadFontPNG(inFile, charWidth, charHeight, firstChar, maxChars = None,
+		skipChars = 0):
+	"""Load a font bitmap from inFile and return a dict which consists of:
+	- width: character width.
+	- height: character height.
+	- first: the first character (ASCII) code in the bitmap.
+	- size: total number of characters in the bitmap.
+	- bitmap: a dict of characters' bitmaps, with keys are the characters' ASCII
+	  code itself. Each value is a list of rows, each row is a list of bytes, 
+		each byte represent 8 bits of that character's bitmap, up to "width" number
+		of bits.
+	"""
+	img = png.Reader(inFile).read()
+	rows = list(img[2])
+	picHeight = len(rows)
+	picWidth = len(rows[0])
+	font = {
+			"first" : firstChar,
+			"width" : charWidth, 
+			"height" : charHeight 
+			}
+	# Number of iterated characters (including skipped ones)..
+	n = 0
+	# Number of characters included in the bitmap.
+	count = 0
+	# Font bitmap.
+	bitmap = {}
+	done = False
+	for y in range(picHeight // charHeight):
+		if done:
+			break
+		for x in range(picWidth // charWidth):
+			n += 1
+			if n <= skipChars:
+				# Skip this character.
+				continue
+			if maxChars is not None and count >= maxChars:
+				done = True
+				break
+			# ASCII code of this character.
+			code = firstChar + count
+			if DEBUG:
+				print("ASCII %02d (%s)" % (code, chr(code)), file = sys.stderr)
+			# Bitmap of a character.
+			char = []
+			for dy in range(charHeight):
+				row = rows[(y * charHeight) + dy]
+				# Convert row's data into bits.
+				r = []
+				b = 0
+				i = 0
+				for v in row[(x * charWidth):(x + 1) * charWidth]:
+					if v > 0:
+						b |= 0x80 >> i
+					i += 1
+					if i == 8:
+						if DEBUG:
+							print(bits(b, False), end = '', file = sys.stderr)
+						r.append(b)
+						b = 0
+						i = 0
+				if DEBUG:
+					print(bits(b, False), file = sys.stderr)
+				r.append(b)
+				char.append(r)
+			bitmap[code] = char
+			count += 1
+	print(f"# Total {count}/{n} characters loaded.")
+	font["bitmap"] = bitmap
+	font["size"] = count
+	return font
+
+def main():
+	"""Main function of this program."""
+	global DEBUG
+	# Default arguments.
+	name = "font"
+	width = None
+	height = None
+	first = None
+	size = None
+	skip = 0
+	# If no argument was provided, print the usage and exit.
+	if len(sys.argv) == 1:
+		print(USAGE)
+		sys.exit(0)
+	# Handle commandline arguments.
+	try:
+		opts, args = getopt.getopt(sys.argv[1:], 'dhn:W:H:f:s:k:',
+				["debug", "help", "name=", "width=", "height=", "first=", "size=", 
+					"skip="])
+	except getopt.error as err:
+		print(f'ERROR: {str(err)}. Use "-h" for usage.', file = sys.stderr)
+		sys.exit(1)
+	for o, v in opts:
+		if o in ('-h', '--help'):
+			print(USAGE)
+			sys.exit(0)
+		elif o in ('-d', '--debug'):
+			DEBUG = True
+		elif o in ('-n', '--name'):
+			name = v
+		elif o in ('-W', '--width'):
+			width = int(v)
+		elif o in ('-H', '--height'):
+			height = int(v)
+		elif o in ('-f', '--first'):
+			first = int(v)
+		elif o in ('-s', '--size'):
+			size = int(v)
+		elif o in ('-k', '--skip'):
+			skip = int(v)
+		else:
+			print('ERROR: Unknown option. Use "-h" for usage.', file = sys.stderr)
+			sys.exit(2)
+	if len(args) == 0:
+		print('ERROR: need an input file.', file = sys.stderr)
+		sys.exit(3)
+	inFile = args[0]
+	# Print settings.
+	print(f"# Input file:    {inFile}")
+	print(f"# Variable name: {name}")
+	print(f"# Font width:    {width}")
+	print(f"# Font height:   {height}")
+	print(f"# First ASCII:   {first}")
+	print(f"# Max size:      {size} characters")
+	print(f"# Skip:          {skip} first characters")
+	print(f"# Font table:    {'All' if size is None else size}")
+	# Load the font.
+	font = loadFontPNG(inFile, width, height, firstChar = first, maxChars = size, 
+			skipChars = 32)
+	# Print the loaded font object.
+	print("%s = {" % name) 
+	print("  'first': %d," % font['first'])
+	print("  'size': %d," % font['size'])
+	print("  'width': %d," % font['width'])
+	print("  'height': %d," % font['height'])
+	print("  'bitmap': {")
+	for c in range(font['first'], font['first'] + font['size']):
+		print("    %3d: [ # (%s)" % (c, chr(c)))
+		for r in font['bitmap'][c]:
+			#  pprint.pprint(r)
+			for c in r:
+				print("        [0b%s, " % bits(c), end = '')
+			print('],')
+		print("      ],")
+	print("    }")
+	print("  }")
+	print(f"""
+if __name__ == '__main__':
+  import pprint
+  print("{name} = \\\\")
+  pprint.pprint({name})""")
+
+# Entry.
+if __name__ == '__main__':
+	main()
+
