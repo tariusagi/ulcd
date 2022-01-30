@@ -30,6 +30,7 @@ OPTION:
   -s, --size=num              Size of font table (number of characters). Default
                               to maximum available from the input file.
   -k, --skip=num              Skip first num of characters.
+	-b, --background=num        Set the value of the background pixels.
 
 This program will print to stdout a Python source module, with comments telling
 the font's attributes, the font object itself, and a small code to pretty print
@@ -55,7 +56,7 @@ def bits(byte, digits = True):
 	return s
 
 def loadFontPNG(inFile, charWidth, charHeight, firstChar, maxChars = None,
-		skipChars = 0):
+		skipChars = 0, bg = 0):
 	"""Load a font bitmap from inFile and return a dict which consists of:
 	- width: character width.
 	- height: character height.
@@ -65,6 +66,16 @@ def loadFontPNG(inFile, charWidth, charHeight, firstChar, maxChars = None,
 	  code itself. Each value is a list of imgRows, each row is a list of bytes, 
 		each byte represent 8 bits of that character's bitmap, up to "width" number
 		of bits.
+	Input:
+	- inFile: a 8-bit, indexed PNG.
+	- charWidth: character's width.
+	- charHeight: character's height.
+	- firstChar: the first character's ASCII code to be included.
+	- maxChars: the maximum number of characters to be included.
+	- skipChars: the number of characters to skip from the begining of the image.
+	- bg: value of the background's value, normally zero, but sometime different
+	  for it depends on the image's color table. Any value other than this will be
+		considered a character's pixel.
 	"""
 	img = png.Reader(inFile).read()
 	planes = img[3]['planes'] 
@@ -113,7 +124,7 @@ def loadFontPNG(inFile, charWidth, charHeight, firstChar, maxChars = None,
 				b = 0
 				i = 0
 				for v in row[(x * charWidth):(x + 1) * charWidth]:
-					if v > 0:
+					if v != bg:
 						b |= 0x80 >> i
 					i += 1
 					if i == 8:
@@ -144,15 +155,16 @@ def main():
 	first = None
 	size = None
 	skip = 0
+	bg = 0
 	# If no argument was provided, print the usage and exit.
 	if len(sys.argv) == 1:
 		print(USAGE)
 		sys.exit(0)
 	# Handle commandline arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], 'dhn:W:H:f:s:k:',
+		opts, args = getopt.getopt(sys.argv[1:], 'dhn:W:H:f:s:k:b:',
 				["debug", "help", "name=", "width=", "height=", "first=", "size=", 
-					"skip="])
+					"skip=", "bg-value="])
 	except getopt.error as err:
 		print(f'ERROR: {str(err)}. Use "-h" for usage.', file = sys.stderr)
 		sys.exit(1)
@@ -174,6 +186,8 @@ def main():
 			size = int(v)
 		elif o in ('-k', '--skip'):
 			skip = int(v)
+		elif o in ('-b', '--bg-value'):
+			bg = int(v)
 		else:
 			print('ERROR: Unknown option. Use "-h" for usage.', file = sys.stderr)
 			sys.exit(2)
@@ -187,14 +201,15 @@ def main():
 	print(f"# Font width:    {width}")
 	print(f"# Font height:   {height}")
 	print(f"# First ASCII:   {first}")
-	print(f"# Max size:      {size} characters")
 	print(f"# Skip:          {skip} first characters")
-	print(f"# Font table:    {'All' if size is None else size}")
+	print(f"# Given size:    {'All' if size is None else size}")
+	print(f"# BG value:      {bg}")
 	# Load the font.
 	font = loadFontPNG(inFile, width, height, firstChar = first, maxChars = size, 
-			skipChars = 32)
+			skipChars = 32, bg = bg)
 	if font is None:
 		sys.exit(4)
+	print(f"# Actual size:   {font['size']} characters")
 	# Print the loaded font object.
 	print("%s = {" % name) 
 	print("  'first': %d," % font['first'])
