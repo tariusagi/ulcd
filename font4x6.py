@@ -7,7 +7,7 @@
 # Given size:    All
 # BG value:      2
 # Actual size:   96 characters
-font6x8 = {
+font4x6 = {
   'first': 32,
   'size': 96,
   'width': 4,

@@ -15,6 +15,7 @@ OPTION:
 -B      Turn backlight on.
 -b      Turn backlight off.
 -d op   Run a demo with option op (default "all") and ignore all other options.
+-f name Use given font name (if supported).
 -h      Display this help and exit.
 -i      Initialize/reset LCD (effectively clear the screen).
 -p      Print LCD parameters.
@@ -37,6 +38,7 @@ def main():
 	backlight = None
 	clear = False
 	demo = None
+	font = None
 	softClock = False
 	printParams = False
 	line = 1
@@ -50,7 +52,7 @@ def main():
 		sys.exit(0)
 	# Handle commandline arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], 'bBc:d:hil:prst:x')
+		opts, args = getopt.getopt(sys.argv[1:], 'bBc:d:f:hil:prst:x')
 	except getopt.error as err:
 		print(f'ERROR: {str(err)}. Use "-h" for usage.', file = sys.stderr)
 		sys.exit(1)
@@ -66,6 +68,8 @@ def main():
 			col = int(v)
 		elif o == '-d':
 			demo = v
+		elif o == '-f':
+			font = v
 		elif o == '-i':
 			init = True
 		elif o == '-l':
@@ -132,6 +136,8 @@ def main():
 		if len(text):
 			if lcdType == "st7920":
 				lcd.setGraphicMode()
+				if font is not None:
+					lcd.setGfxFont(font)
 				lcd.printGfxText(text, line = line, col = col)
 				lcd.redraw()
 			else:

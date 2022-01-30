@@ -8,6 +8,7 @@ import copy
 import png
 from baselcd import BaseLCD
 from font6x8 import font6x8
+from font4x6 import font4x6
 
 # Serial transmission speed in Hz. Set to 1.93Mhz to be safe, but 15.6Mhz
 # (15600000Hz) tested working well on a Raspberry Pi Zero W.
@@ -284,10 +285,20 @@ class ST7920HSPI(BaseLCD):
 				self._setMode(DATA)
 				self._send2Bytes(hi, lo)
 
-	def printGfxText(self, text, line = 1, col = 1, fillChar = ' ',
-			font = font6x8):
+	def setGfxFont(self, name):
+		for s in self._gfxFonts:
+			if s == name:
+				self._gfxFont = self._gfxFonts[s]
+	
+	def listGfxFonts(self):
+		for s in self._gfxFonts:
+			print(s, end = '')
+		print('')
+
+	def printGfxText(self, text, line = 1, col = 1, fillChar = ' '):
 		if self._textMode:
 			return
+		font = self._gfxFont
 		LINES = HEIGHT // font['height']
 		COLS = WIDTH // font['width']
 		if line < 1 or line > LINES or col < 1 or col > COLS:
@@ -344,12 +355,49 @@ class ST7920HSPI(BaseLCD):
 			self.redraw()
 			sleep(1.0)
 
+	def _demo4x6(self):
+		self.clearScreen()
+		self.setGraphicMode()
+		self.clearScreen(0)
+		self.redraw()
+		sleep(0.5)
+		self.setGfxFont('4x6')
+		#6x8 font ruler:  "---------------------"
+		self.printGfxText("The 4x6 font demo!")
+		self.printGfxText("A custom font in gfx", line = 2)
+		self.printGfxText("4px width, 6px height", line = 3)
+		self.redraw()
+		sleep(1.0)
+		self.printGfxText("Please wait...", line = 3)
+		self.redraw()
+		sleep(0.5)
+		for i in range(WIDTH // self._gfxFont['width']):
+			self.printGfxText(">".rjust(i + 1, '='), line = 4)
+			self.redraw()
+			sleep(0.05)
+		self.printGfxText("Numbers:", line = 1)
+		self.printGfxText("0123456789-+=<>/", line = 2)
+		self.printGfxText("~!@#$%^&*()_,.;?", line = 3)
+		self.redraw()
+		self._demoGfxCountdown(init = True)
+		self.printGfxText("Lower cases:", line = 1)
+		self.printGfxText("abcdefghijklmnop", line = 2);
+		self.printGfxText("qrstuvwxyz", line = 3)
+		self.redraw()
+		self._demoGfxCountdown(5)
+		self.printGfxText("Upper cases:", line = 1)
+		self.printGfxText("ABCDEFGHIJKLMNOP", line = 2);
+		self.printGfxText("QRSTUVWXYZ", line = 3)
+		self.redraw()
+		self._demoGfxCountdown(5)
+
 	def _demo6x8(self):
 		self.clearScreen()
 		self.setGraphicMode()
 		self.clearScreen(0)
 		self.redraw()
 		sleep(0.5)
+		self.setGfxFont('6x8')
 		#6x8 font ruler:  "---------------------"
 		self.printGfxText("The 6x8 font demo!")
 		self.printGfxText("A custom font in gfx", line = 2)
@@ -359,7 +407,7 @@ class ST7920HSPI(BaseLCD):
 		self.printGfxText("Please wait...", line = 3)
 		self.redraw()
 		sleep(0.5)
-		for i in range(WIDTH // font6x8['width']):
+		for i in range(WIDTH // self._gfxFont['width']):
 			self.printGfxText(">".rjust(i + 1, '='), line = 4)
 			self.redraw()
 			sleep(0.05)
@@ -433,6 +481,7 @@ class ST7920HSPI(BaseLCD):
 			self.printText("To graphic mode", line = 1)
 			self._demoCountdown(init = True, duration = 3)
 			self._demoGraphic()
+			self._demo4x6()
 			self._demo6x8()
 			self.setTextMode()
 			self.printText("Turn off in  s", line = 4, col = 2)
@@ -443,6 +492,8 @@ class ST7920HSPI(BaseLCD):
 			self.backlight(False)
 		elif option == "gfx":
 			self._demoGraphic()
+		elif option == "4x6":
+			self._demo4x6()
 		elif option == "6x8":
 			self._demo6x8()
 
@@ -450,21 +501,6 @@ class ST7920HSPI(BaseLCD):
 		"""Return a space filled text buffer with given number of lines and width."""
 		buf = [[' '] * width for i in range(lines)]
 		return buf
-
-	def _loadFontSheet(self, filename, cw, ch):
-		img = png.Reader(filename).read()
-		rows = list(img[2])
-		height = len(rows)
-		width = len(rows[0])
-		sheet = []
-		for y in range(height//ch):
-			for x in range(width//cw):
-				char = []
-				for sy in range(ch):
-					row = rows[(y*ch)+sy]
-					char.append(row[(x*cw):(x+1)*cw])
-				sheet.append(char)
-		return (sheet, cw, ch)
 
 	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24):
 		super().__init__(driver = "ST7290", e = e, rw = rw, rst = rst, bla = bla,
@@ -485,3 +521,7 @@ class ST7920HSPI(BaseLCD):
 		self._hcgrom = True
 		self._gfxBuf = [[0] * 17 for i in range(64)]
 		self._textBuf = self._newTextBuf(FONT8x16_LINES, FONT8x16_COLS)
+		# List of supported fonts.
+		self._gfxFonts = {'default' : font6x8, '6x8' : font6x8, '4x6' : font4x6}
+		# Default font for printing text in gfx mode.
+		self._gfxFont = self._gfxFonts['default']
