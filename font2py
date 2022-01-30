@@ -40,7 +40,7 @@ The font object is a Python dict, which consists of:
 - first: the first character (ASCII) code in the bitmap.
 - size: total number of characters in the bitmap.
 - bitmap: a dict of characters' bitmaps, with keys are the characters' ASCII
-code itself. Each value is a list of rows, each row is a list of bytes, 
+code itself. Each value is a list of imgRows, each row is a list of bytes, 
 each byte represent 8 bits of that character's bitmap, up to "width" number
 of bits.
 """
@@ -62,45 +62,52 @@ def loadFontPNG(inFile, charWidth, charHeight, firstChar, maxChars = None,
 	- first: the first character (ASCII) code in the bitmap.
 	- size: total number of characters in the bitmap.
 	- bitmap: a dict of characters' bitmaps, with keys are the characters' ASCII
-	  code itself. Each value is a list of rows, each row is a list of bytes, 
+	  code itself. Each value is a list of imgRows, each row is a list of bytes, 
 		each byte represent 8 bits of that character's bitmap, up to "width" number
 		of bits.
 	"""
 	img = png.Reader(inFile).read()
-	rows = list(img[2])
-	picHeight = len(rows)
-	picWidth = len(rows[0])
+	planes = img[3]['planes'] 
+	if planes != 1:
+		print("ERROR: %d bits image detected. Only support 8 bits" % (8 * planes),
+				file = sys.stderr)
+		return None
+	imgRows = list(img[2])
+	imgHeight = len(imgRows)
+	imgWidth = len(imgRows[0])
+	if DEBUG:
+		print(f"Image width {imgWidth}, height {imgHeight}", file = sys.stderr)
 	font = {
 			"first" : firstChar,
 			"width" : charWidth, 
 			"height" : charHeight 
 			}
-	# Number of iterated characters (including skipped ones)..
-	n = 0
-	# Number of characters included in the bitmap.
-	count = 0
+	# Number of all characters in the image.
+	total = 0
+	# Number of converted characters.
+	converted = 0
 	# Font bitmap.
 	bitmap = {}
 	done = False
-	for y in range(picHeight // charHeight):
+	for y in range(imgHeight // charHeight):
 		if done:
 			break
-		for x in range(picWidth // charWidth):
-			n += 1
-			if n <= skipChars:
+		for x in range(imgWidth // charWidth):
+			total += 1
+			if total <= skipChars:
 				# Skip this character.
 				continue
-			if maxChars is not None and count >= maxChars:
+			if maxChars is not None and converted >= maxChars:
 				done = True
 				break
 			# ASCII code of this character.
-			code = firstChar + count
+			code = firstChar + converted
 			if DEBUG:
 				print("ASCII %02d (%s)" % (code, chr(code)), file = sys.stderr)
 			# Bitmap of a character.
 			char = []
 			for dy in range(charHeight):
-				row = rows[(y * charHeight) + dy]
+				row = imgRows[(y * charHeight) + dy]
 				# Convert row's data into bits.
 				r = []
 				b = 0
@@ -120,10 +127,11 @@ def loadFontPNG(inFile, charWidth, charHeight, firstChar, maxChars = None,
 				r.append(b)
 				char.append(r)
 			bitmap[code] = char
-			count += 1
-	print(f"# Total {count}/{n} characters loaded.")
+			converted += 1
+	if DEBUG:
+		print(f"# Total {converted} characters converted.", file = sys.stderr)
 	font["bitmap"] = bitmap
-	font["size"] = count
+	font["size"] = converted
 	return font
 
 def main():
@@ -185,6 +193,8 @@ def main():
 	# Load the font.
 	font = loadFontPNG(inFile, width, height, firstChar = first, maxChars = size, 
 			skipChars = 32)
+	if font is None:
+		sys.exit(4)
 	# Print the loaded font object.
 	print("%s = {" % name) 
 	print("  'first': %d," % font['first'])
