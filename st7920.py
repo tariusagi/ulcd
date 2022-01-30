@@ -7,7 +7,7 @@ import pprint
 import copy
 import png
 from baselcd import BaseLCD
-from font3x5 import font3x5
+from font6x8 import font6x8
 
 # Serial transmission speed in Hz. Set to 1.93Mhz to be safe, but 15.6Mhz
 # (15600000Hz) tested working well on a Raspberry Pi Zero W.
@@ -24,20 +24,6 @@ FONT8x16_COLS = 16
 # Graphic mode settings.
 WIDTH = 128
 HEIGHT = 64
-# FONT 3x5 settings.
-FONT3x5_LINES = 10
-FONT3x5_COLS = 32
-FONT3x5_WIDTH=3
-FONT3x5_HEIGHT=5
-FONT3x5_VSPACE=1
-FONT3x5_HSPACE=1
-# FONT 6x8 settings.
-FONT6x8_LINES = 8
-FONT6x8_COLS = 21
-FONT6x8_WIDTH=6
-FONT6x8_HEIGHT=8
-FONT6x8_VSPACE=0
-FONT6x8_HSPACE=0
 
 class ST7920HSPI(BaseLCD):
 	"""Handle LCD with Sitronix ST7290 chip in SPI mode.  The default pins are 
@@ -221,8 +207,6 @@ class ST7920HSPI(BaseLCD):
 			self._sendByte(0x01, 1600)
 			self._textBuf = self._newTextBuf(FONT8x16_LINES, FONT8x16_COLS)
 		else:
-			# Reset graphic mode text buffers.
-			self._3x5buf = self._newTextBuf(FONT3x5_LINES, FONT3x5_COLS)
 			# Reset internal graphic buffer.
 			self._gfxBuf = [[pattern] * 17 for i in range(64)]
 			# Mark all lines dirty.
@@ -300,73 +284,43 @@ class ST7920HSPI(BaseLCD):
 				self._setMode(DATA)
 				self._send2Bytes(hi, lo)
 
-	def printText3x5(self, text, line = 1, col = 1, fillChar = ' '):
+	def printGfxText(self, text, line = 1, col = 1, fillChar = ' ',
+			font = font6x8):
 		if self._textMode:
 			return
-		if line < 1 or line > FONT3x5_LINES or col < 1 or col > FONT3x5_COLS:
+		LINES = HEIGHT // font['height']
+		COLS = WIDTH // font['width']
+		if line < 1 or line > LINES or col < 1 or col > COLS:
 			# Ignore invalid position.
 			return
 		if fillChar is not None:
-			text = self._fillTextLine(text, col, FONT3x5_COLS, fillChar)
+			text = self._fillTextLine(text, col, COLS, fillChar)
 			col = 1
 		# Trim text longer than display.
-		if (len(text) + col - 1 > FONT3x5_COLS):
-			text = text[0:FONT3x5_COLS - col + 1]
+		if (len(text) + col - 1 > COLS):
+			text = text[0:COLS - col + 1]
 		# Draw characters on gfx buffer.
-		x = (col - 1) * (FONT3x5_WIDTH + FONT3x5_HSPACE)
-		y = (line - 1) * (FONT3x5_HEIGHT + FONT3x5_VSPACE)
-		for char in text:
-			char = ord(char)
-			# Set error for out of range.
-			if (32 > char or char > 126):
-				char = 127
-			# The font set starts at ASCII 32 (space).
-			char -= 32
-			# Draw the character.
-			for c in range(FONT3x5_WIDTH):
-				for r in range(FONT3x5_HEIGHT):
-					if font3x5[char][c][r]:
-						self.plot(x + c, y + r, inverted = False)
-					else:
-						self.erase(x + c, y + r)
-					if c == FONT3x5_WIDTH - 1:
-						# Last column? Leave a blank vertical line after.
-						self.erase(x + c + 1, y + r)
-			# Prepare to draw next character.
-			x += FONT3x5_WIDTH + FONT3x5_HSPACE
-
-	def printText6x8(self, text, line = 1, col = 1, fillChar = ' '):
-		if self._textMode:
-			return
-		if line < 1 or line > FONT6x8_LINES or col < 1 or col > FONT6x8_COLS:
-			# Ignore invalid position.
-			return
-		if fillChar is not None:
-			text = self._fillTextLine(text, col, FONT6x8_COLS, fillChar)
-			col = 1
-		# Trim text longer than display.
-		if (len(text) + col - 1 > FONT6x8_COLS):
-			text = text[0:FONT6x8_COLS - col + 1]
-		# Draw characters on gfx buffer.
-		x = (col - 1) * (FONT6x8_WIDTH + FONT6x8_HSPACE)
-		y = (line - 1) * (FONT6x8_HEIGHT + FONT6x8_VSPACE)
+		x = (col - 1) * font['width']
+		y = (line - 1) * font['height']
 		for c in text:
 			try:
-				font, cw, ch = self._fontSheet6x8
-				char = font[ord(c)]
-				sy = 0
-				for row in char:
-					sx = 0
-					for px in row:
-						if px:
-							self.plot(x + sx, y + sy)
-						else:
-							self.erase(x + sx, y + sy)
-						sx += 1
-					sy += 1
+				rows = font['bitmap'][ord(c)]
+				dy = 0
+				for r in rows:
+					dx = 0
+					for byte in r:
+						for i in range(8):
+							if dx > font['width']:
+								break
+							if byte & (0x80 >> i):
+								self.plot(x + dx, y + dy)
+							else:
+								self.erase(x + dx, y + dy)
+							dx += 1
+					dy += 1
 			except KeyError:
 				pass
-			x += cw
+			x += font['width']
 
 	def clearTextLine(self, line):
 		if self._textMode:
@@ -381,58 +335,14 @@ class ST7920HSPI(BaseLCD):
 			self.printText(str(i), line = 4, col = 11, fillChar = None)
 			sleep(1.0)
 
-	def _demoCountdown3x5(self, duration = 3, init = False):
+	def _demoGfxCountdown(self, duration = 3, init = False):
 		if init:
-			self.printText3x5("Next in  s", line = 4, col = 3)
+			self.printGfxText("Next in  s", line = 4, col = 3)
 			self.redraw()
 		for i in range(duration, 0, -1):
-			self.printText3x5(str(i), line = 4, col = 11, fillChar = None)
+			self.printGfxText(str(i), line = 4, col = 11, fillChar = None)
 			self.redraw()
 			sleep(1.0)
-
-	def _demoCountdown6x8(self, duration = 3, init = False):
-		if init:
-			self.printText6x8("Next in  s", line = 4, col = 3)
-			self.redraw()
-		for i in range(duration, 0, -1):
-			self.printText6x8(str(i), line = 4, col = 11, fillChar = None)
-			self.redraw()
-			sleep(1.0)
-
-	def _demo3x5(self):
-		self.clearScreen()
-		self.setGraphicMode()
-		self.clearScreen(0)
-		self.redraw()
-		sleep(0.5)
-		#3x5 font ruler:  "--------------------------------"
-		self.printText3x5("The AMAZING 3x5 font demo!")
-		self.printText3x5("This is a custom font in graphic", line = 2)
-		self.printText3x5("mode with 3px width, 5px height.", line = 3)
-		self.redraw()
-		sleep(1.0)
-		self.printText3x5("Please wait...", line = 3)
-		self.redraw()
-		sleep(0.5)
-		for i in range(FONT3x5_COLS):
-			self.printText3x5(">".rjust(i + 1, '='), line = 4)
-			self.redraw()
-			sleep(0.05)
-		self.printText3x5("Numbers:", line = 1)
-		self.printText3x5("0123456789-+=<>/", line = 2)
-		self.printText3x5("~!@#$%^&*()_,.;?", line = 3)
-		self.redraw()
-		self._demoCountdown3x5(init = True)
-		self.printText3x5("Lower cases:", line = 1)
-		self.printText3x5("abcdefghijklmnop", line = 2);
-		self.printText3x5("qrstuvwxyz", line = 3)
-		self.redraw()
-		self._demoCountdown3x5(5)
-		self.printText3x5("Upper cases:", line = 1)
-		self.printText3x5("ABCDEFGHIJKLMNOP", line = 2);
-		self.printText3x5("QRSTUVWXYZ", line = 3)
-		self.redraw()
-		self._demoCountdown3x5(5)
 
 	def _demo6x8(self):
 		self.clearScreen()
@@ -441,33 +351,33 @@ class ST7920HSPI(BaseLCD):
 		self.redraw()
 		sleep(0.5)
 		#6x8 font ruler:  "---------------------"
-		self.printText6x8("The 6x8 font demo!")
-		self.printText6x8("A custom font in gfx", line = 2)
-		self.printText6x8("6px width, 8px height", line = 3)
+		self.printGfxText("The 6x8 font demo!")
+		self.printGfxText("A custom font in gfx", line = 2)
+		self.printGfxText("6px width, 8px height", line = 3)
 		self.redraw()
 		sleep(1.0)
-		self.printText6x8("Please wait...", line = 3)
+		self.printGfxText("Please wait...", line = 3)
 		self.redraw()
 		sleep(0.5)
-		for i in range(FONT6x8_COLS):
-			self.printText6x8(">".rjust(i + 1, '='), line = 4)
+		for i in range(WIDTH // font6x8['width']):
+			self.printGfxText(">".rjust(i + 1, '='), line = 4)
 			self.redraw()
 			sleep(0.05)
-		self.printText6x8("Numbers:", line = 1)
-		self.printText6x8("0123456789-+=<>/", line = 2)
-		self.printText6x8("~!@#$%^&*()_,.;?", line = 3)
+		self.printGfxText("Numbers:", line = 1)
+		self.printGfxText("0123456789-+=<>/", line = 2)
+		self.printGfxText("~!@#$%^&*()_,.;?", line = 3)
 		self.redraw()
-		self._demoCountdown6x8(init = True)
-		self.printText6x8("Lower cases:", line = 1)
-		self.printText6x8("abcdefghijklmnop", line = 2);
-		self.printText6x8("qrstuvwxyz", line = 3)
+		self._demoGfxCountdown(init = True)
+		self.printGfxText("Lower cases:", line = 1)
+		self.printGfxText("abcdefghijklmnop", line = 2);
+		self.printGfxText("qrstuvwxyz", line = 3)
 		self.redraw()
-		self._demoCountdown6x8(5)
-		self.printText6x8("Upper cases:", line = 1)
-		self.printText6x8("ABCDEFGHIJKLMNOP", line = 2);
-		self.printText6x8("QRSTUVWXYZ", line = 3)
+		self._demoGfxCountdown(5)
+		self.printGfxText("Upper cases:", line = 1)
+		self.printGfxText("ABCDEFGHIJKLMNOP", line = 2);
+		self.printGfxText("QRSTUVWXYZ", line = 3)
 		self.redraw()
-		self._demoCountdown6x8(5)
+		self._demoGfxCountdown(5)
 
 	def _demoGraphic(self):
 		self.clearScreen()
@@ -523,7 +433,6 @@ class ST7920HSPI(BaseLCD):
 			self.printText("To graphic mode", line = 1)
 			self._demoCountdown(init = True, duration = 3)
 			self._demoGraphic()
-			self._demo3x5()
 			self._demo6x8()
 			self.setTextMode()
 			self.printText("Turn off in  s", line = 4, col = 2)
@@ -534,8 +443,6 @@ class ST7920HSPI(BaseLCD):
 			self.backlight(False)
 		elif option == "gfx":
 			self._demoGraphic()
-		elif option == "3x5":
-			self._demo3x5()
 		elif option == "6x8":
 			self._demo6x8()
 
@@ -578,8 +485,3 @@ class ST7920HSPI(BaseLCD):
 		self._hcgrom = True
 		self._gfxBuf = [[0] * 17 for i in range(64)]
 		self._textBuf = self._newTextBuf(FONT8x16_LINES, FONT8x16_COLS)
-		self._3x5buf = self._newTextBuf(FONT3x5_LINES, FONT3x5_COLS)
-		# Load 6x8 font from file.
-		path = os.path.abspath(__file__)
-		dirPath = os.path.dirname(path)
-		self._fontSheet6x8 = self._loadFontSheet(dirPath + "/font6x8.png", 6, 8)

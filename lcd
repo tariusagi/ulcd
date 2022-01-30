@@ -132,7 +132,7 @@ def main():
 		if len(text):
 			if lcdType == "st7920":
 				lcd.setGraphicMode()
-				lcd.printText6x8(text, line = line, col = col)
+				lcd.printGfxText(text, line = line, col = col)
 				lcd.redraw()
 			else:
 				lcd.printText(text, line = line, col = col)
