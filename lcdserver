@@ -21,6 +21,7 @@ print_usage() {
 	-h      Print this usage.
 	-l      Log to the given file.
 	-t type Set the LCD type for "lcd" command. Run "lcd -h" for help.
+	-f font Set the font for the LCD (depends on the LCD type).
 	ENDOFUSAGE
 }
 
@@ -47,8 +48,9 @@ fi
 
 # Now handle command line arguments based on predefined list. Refer to "getopts"
 # document to understand this code.
-while getopts "hl:t:w" opt; do
+while getopts "f:hl:t:w" opt; do
 	case ${opt} in
+	f) font="-f $OPTARG"; echo Will use font $font ;;
 	l) log=$OPTARG ;;
 	h) print_usage; exit ;;
 	t) lcd_type=$OPTARG ;;
@@ -101,16 +103,16 @@ if [ -z "$worker" ]; then
 	test -d ~/run || mkdir ~/run
 	# test -n "$log" && { test -d ~/log || mkdir ~/log; }
 	# Initialize the LCD.
-	lcd -t $lcd_type -i -x -B "LCDSERVER..." > /dev/null
+	lcd -t $lcd_type -i -x -B $font "LCDSERVER..." > /dev/null
 	# Handle SIGTERM.
 	trap "on_exit" TERM INT
 	# Use ncat to listen to network connections and let it call this script back 
 	# in worker mode.
 	log Listening at $ip:$port, LCD $lcd_type, worker at $SCRIPT_FULLPATH
 	if [ -z "$log" ]; then
-		ncat -k -l $ip $port -e "$SCRIPT_FULLPATH -w -t $lcd_type"
+		ncat -k -l $ip $port -e "$SCRIPT_FULLPATH -w -t $lcd_type $font"
 	else
-		ncat -k -l $ip $port -e "$SCRIPT_FULLPATH -w -t $lcd_type -l $log"
+		ncat -k -l $ip $port -e "$SCRIPT_FULLPATH -w -t $lcd_type $font -l $log"
 	fi
 	ret=$?
 	log Server terminated with code $ret
@@ -137,22 +139,52 @@ else
 			line1)
 				text=${line#$cmd }
 				log Line 1 = \"$text\"
-				lcd -t $lcd_type -l1 "$text"
+				lcd -t $lcd_type $font -l1 "$text"
 				;;
 			line2)
 				text=${line#$cmd }
 				log Line 2 = \"$text\"
-				lcd -t $lcd_type -l2 "$text"
+				lcd -t $lcd_type $font -l2 "$text"
 				;;
 			line3)
 				text=${line#$cmd }
 				log Line 3 = \"$text\"
-				lcd -t $lcd_type -l3 "$text"
+				lcd -t $lcd_type $font -l3 "$text"
 				;;
 			line4)
 				text=${line#$cmd }
 				log Line 4 = \"$text\"
-				lcd -t $lcd_type -l4 "$text"
+				lcd -t $lcd_type $font -l4 "$text"
+				;;
+			line5)
+				text=${line#$cmd }
+				log Line 5 = \"$text\"
+				lcd -t $lcd_type $font -l5 "$text"
+				;;
+			line6)
+				text=${line#$cmd }
+				log Line 6 = \"$text\"
+				lcd -t $lcd_type $font -l6 "$text"
+				;;
+			line7)
+				text=${line#$cmd }
+				log Line 7 = \"$text\"
+				lcd -t $lcd_type $font -l7 "$text"
+				;;
+			line8)
+				text=${line#$cmd }
+				log Line 8 = \"$text\"
+				lcd -t $lcd_type $font -l8 "$text"
+				;;
+			line9)
+				text=${line#$cmd }
+				log Line 9 = \"$text\"
+				lcd -t $lcd_type $font -l9 "$text"
+				;;
+			line10)
+				text=${line#$cmd }
+				log Line 10 = \"$text\"
+				lcd -t $lcd_type $font -l10 "$text"
 				;;
 			*)
 				log $line
