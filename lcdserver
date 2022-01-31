@@ -136,55 +136,11 @@ else
 				log Clear screen
 				lcd -t $lcd_type -x > /dev/null
 				;;
-			line1)
+			line*)
 				text=${line#$cmd }
-				log Line 1 = \"$text\"
-				lcd -t $lcd_type $font -l1 "$text"
-				;;
-			line2)
-				text=${line#$cmd }
-				log Line 2 = \"$text\"
-				lcd -t $lcd_type $font -l2 "$text"
-				;;
-			line3)
-				text=${line#$cmd }
-				log Line 3 = \"$text\"
-				lcd -t $lcd_type $font -l3 "$text"
-				;;
-			line4)
-				text=${line#$cmd }
-				log Line 4 = \"$text\"
-				lcd -t $lcd_type $font -l4 "$text"
-				;;
-			line5)
-				text=${line#$cmd }
-				log Line 5 = \"$text\"
-				lcd -t $lcd_type $font -l5 "$text"
-				;;
-			line6)
-				text=${line#$cmd }
-				log Line 6 = \"$text\"
-				lcd -t $lcd_type $font -l6 "$text"
-				;;
-			line7)
-				text=${line#$cmd }
-				log Line 7 = \"$text\"
-				lcd -t $lcd_type $font -l7 "$text"
-				;;
-			line8)
-				text=${line#$cmd }
-				log Line 8 = \"$text\"
-				lcd -t $lcd_type $font -l8 "$text"
-				;;
-			line9)
-				text=${line#$cmd }
-				log Line 9 = \"$text\"
-				lcd -t $lcd_type $font -l9 "$text"
-				;;
-			line10)
-				text=${line#$cmd }
-				log Line 10 = \"$text\"
-				lcd -t $lcd_type $font -l10 "$text"
+				line=${cmd:4}
+				log Line $line = \"$text\"
+				lcd -t $lcd_type $font -l $line "$text"
 				;;
 			*)
 				log $line
