@@ -17,6 +17,7 @@ OPTION:
 -d op   Run a demo with option op (default "all") and ignore all other options.
 -f name Use given font name (if supported).
 -h      Display this help and exit.
+-g      Use graphic mode (if supported).
 -i      Initialize/reset LCD (effectively clear the screen).
 -p      Print LCD parameters.
 -t      LCD type (required). See supported types below.
@@ -39,6 +40,7 @@ def main():
 	lcdType = None
 	init = False
 	backlight = None
+	gfx = None
 	clear = False
 	demo = None
 	font = None
@@ -55,7 +57,7 @@ def main():
 		sys.exit(0)
 	# Handle commandline arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], 'bBc:d:f:hil:prst:x')
+		opts, args = getopt.getopt(sys.argv[1:], 'bBc:d:f:ghil:prst:x')
 	except getopt.error as err:
 		print(f'ERROR: {str(err)}. Use "-h" for usage.', file = sys.stderr)
 		sys.exit(1)
@@ -63,6 +65,8 @@ def main():
 		if o == '-h':
 			print(USAGE)
 			sys.exit(0)
+		elif o == '-g':
+			gfx = True
 		elif o == '-b':
 			backlight = False
 		elif o == '-B':
@@ -123,28 +127,18 @@ def main():
 			sys.exit(0)
 		if init:
 			lcd.init()
-			if lcdType == "st7920":
-				lcd.setGraphicMode()
-				lcd.clearScreen(0)
-				lcd.redraw()
 		if backlight is not None:
 			lcd.backlight(backlight)
+		if gfx:
+			lcd.setGfxMode()
+		else:
+			lcd.setTextMode()
+		if font is not None:
+			lcd.setGfxFont(font)
 		if clear:
-			if lcdType == "st7920":
-				lcd.setGraphicMode()
-				lcd.clearScreen(0)
-				lcd.redraw()
-			else:
-				lcd.clearScreen()
+			lcd.clearScreen()
 		if len(text):
-			if lcdType == "st7920":
-				lcd.setGraphicMode()
-				if font is not None:
-					lcd.setGfxFont(font)
-				lcd.printGfxText(text, line = line, col = col)
-				lcd.redraw()
-			else:
-				lcd.printText(text, line = line, col = col)
+			lcd.printText(text, line = line, col = col)
 		if cleanup:
 			lcd.cleanup()
  

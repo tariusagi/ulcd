@@ -43,9 +43,38 @@ class BaseLCD:
 		must be implemented by child classes"""
 		self._backlight = state
 
+	def setTextMode(self):	
+		print("ERROR: setTextMode is not implemented", file = sys.stderr)
+		return False
+
+	def setGfxMode(self):	
+		print("ERROR: setGfxMode is not implemented", file = sys.stderr)
+		return False
+
+	def setGfxFont(self, name):
+		print("ERROR: setGfxFont is not implemented", file = sys.stderr)
+		return False
+
+	def printText(self, text, line = 1, col = 1, fillChar = ' '): 
+		"""Print a text at the given line and column. Missing character will be 
+		filled with fillChar, default is space. If fillChar is None, then the text
+		will be printed as-is"""
+		print("ERROR: printText is not implemented", file = sys.stderr)
+		return False
+
+	def clearTextLine(self, line):
+		"""Clear given line of text by filling it with spaces"""
+		print("ERROR: clearTextLine is not implemented", file = sys.stderr)
+		return False
+
+	def clearScreen(self, pattern = 0): 
+		"""Clear the entire screen, both text and graphic mode."""
+		print("ERROR: clearScreen is not implemented", file = sys.stderr)
+		return False
+
 	def demo(self):
 		"""Perform demonstration on supported LCD"""
-		print("ERROR: Demo is not supported in base class", file = sys.stderr)
+		print("ERROR: Demo is not implemented", file = sys.stderr)
 		return False
 
 	def printParams(self):

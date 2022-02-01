@@ -50,6 +50,30 @@ class ST7920HSPI(BaseLCD):
 	# changes in the line, from MSB (first pair) to LSB (last pair).
 	_gfxBuf = []
 
+	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24):
+		super().__init__(driver = "ST7290", e = e, rw = rw, rst = rst, bla = bla,
+				columns = 16, lines = 4, width = 128, height = 64)
+		self._debug = False
+		self._txMode = None
+		GPIO.setwarnings(False)
+		GPIO.setmode(GPIO.BCM)
+		if self._bla is not None:
+			GPIO.setup(self._bla, GPIO.OUT)
+		# Instantiate the SPI object.
+		self._spi = spidev.SpiDev()
+		self._spi.open(0, 0)
+		self._spi.max_speed_hz = SPI_SPEED
+		self._spi.no_cs = True
+		# Default to text mode with 8x16 HCGROM font, 4 lines, 16 letters width.
+		self._textMode = True
+		self._hcgrom = True
+		self._gfxBuf = [[0] * 17 for i in range(64)]
+		self._textBuf = self._newTextBuf(FONT8x16_LINES, FONT8x16_COLS)
+		# List of supported fonts.
+		self._gfxFonts = {'default' : font6x8, '6x8' : font6x8, '4x6' : font4x6}
+		# Default font for printing text in gfx mode.
+		self._gfxFont = self._gfxFonts['default']
+
 	def _pulse(self):
 		GPIO.output(self._e, GPIO.HIGH)
 		GPIO.output(self._e, GPIO.LOW)
@@ -194,14 +218,14 @@ class ST7920HSPI(BaseLCD):
 			self._sendByte(0x0C) # Display ON, cursor OFF, no blinking
 			self._sendByte(0x80) # Reset AC.
 
-	def setGraphicMode(self):	
+	def setGfxMode(self):	
 		if self._textMode:
 			self._textMode = False
 			self._setMode(CMD)
 			self._sendByte(0x34) # Extend instruction set
 			self._sendByte(0x36) # Turn on graphic display.
 
-	def clearScreen(self, pattern = 0): 
+	def clearScreen(self, pattern = 0, redraw = True): 
 		"""Clear the entire screen, both text and graphic mode."""
 		if self._textMode: 
 			self._setMode(CMD)
@@ -213,8 +237,10 @@ class ST7920HSPI(BaseLCD):
 			# Mark all lines dirty.
 			for y in range(64):
 				self._gfxBuf[y][16] = 0xFF
+		if redraw:
+			self.redraw()
 
-	def plot(self, x, y, inverted = False):
+	def plot(self, x, y, inverted = False, redraw = True):
 		"""Plot a dot at x, y. If inverted = True, then the dot will be inverted."""
 		if (x > 127) or (y > 63):
 			return
@@ -226,8 +252,10 @@ class ST7920HSPI(BaseLCD):
 			self._gfxBuf[y][byteIndex] ^= 0x80 >> (x % 8)
 		else:
 			self._gfxBuf[y][byteIndex] |= 0x80 >> (x % 8)
+		if redraw:
+			self.redraw()
 
-	def erase(self, x, y):
+	def erase(self, x, y, redraw = True):
 		"""Erase a dot at x, y (its bit will always be set to zero)."""
 		if (x > 127) or (y > 63):
 			return
@@ -236,16 +264,22 @@ class ST7920HSPI(BaseLCD):
 		self._gfxBuf[y][16] |= 0x80 >> (byteIndex // 2)
 		# Process pixel bit.
 		self._gfxBuf[y][byteIndex] &= ~(0x80 >> (x % 8))
+		if redraw:
+			self.redraw()
 
 	def redraw(self):
 		"""Redraw the screen by sending changed lines to the LCD."""
+		if self._textMode:
+			return
 		for y in range(64):
 			self._sendLine(y)
 
-	def printText(self, text, line = 1, col = 1, fillChar = ' '): 
+	def _printText(self, text, line = 1, col = 1, fillChar = ' '): 
 		"""Print a text at the given line and column. Missing character will be 
 		filled with fillChar, default is space. If fillChar is None, then the text
 		will be printed as-is"""
+		if not self._textMode:
+			return
 		if line < 1 or line > FONT8x16_LINES or col < 1 or col > FONT8x16_COLS:
 			# Ignore invalid position.
 			return
@@ -285,17 +319,7 @@ class ST7920HSPI(BaseLCD):
 				self._setMode(DATA)
 				self._send2Bytes(hi, lo)
 
-	def setGfxFont(self, name):
-		for s in self._gfxFonts:
-			if s == name:
-				self._gfxFont = self._gfxFonts[s]
-	
-	def listGfxFonts(self):
-		for s in self._gfxFonts:
-			print(s, end = '')
-		print('')
-
-	def printGfxText(self, text, line = 1, col = 1, fillChar = ' '):
+	def _printGfxText(self, text, line = 1, col = 1, fillChar = ' '):
 		if self._textMode:
 			return
 		font = self._gfxFont
@@ -324,20 +348,14 @@ class ST7920HSPI(BaseLCD):
 							if dx > font['width']:
 								break
 							if byte & (0x80 >> i):
-								self.plot(x + dx, y + dy)
+								self.plot(x + dx, y + dy, redraw = False)
 							else:
-								self.erase(x + dx, y + dy)
+								self.erase(x + dx, y + dy, redraw = False)
 							dx += 1
 					dy += 1
 			except KeyError:
 				pass
 			x += font['width']
-
-	def clearTextLine(self, line):
-		if self._textMode:
-			self.printText('', line = line)
-			# Clear text buffer.
-			self._textBuf[line - 1] = BLANK_LINE
 
 	def _demoCountdown(self, duration = 3, init = False):
 		if init:
@@ -348,107 +366,130 @@ class ST7920HSPI(BaseLCD):
 
 	def _demoGfxCountdown(self, duration = 3, init = False):
 		if init:
-			self.printGfxText("Next in  s", line = 4, col = 3)
+			self.printText("Next in  s", line = 4, col = 3)
 			self.redraw()
 		for i in range(duration, 0, -1):
-			self.printGfxText(str(i), line = 4, col = 11, fillChar = None)
+			self.printText(str(i), line = 4, col = 11, fillChar = None)
 			self.redraw()
 			sleep(1.0)
 
 	def _demo4x6(self):
 		self.clearScreen()
-		self.setGraphicMode()
+		self.setGfxMode()
 		self.clearScreen(0)
-		self.redraw()
 		sleep(0.5)
 		self.setGfxFont('4x6')
 		#6x8 font ruler:  "---------------------"
-		self.printGfxText("The 4x6 font demo!")
-		self.printGfxText("A custom font in gfx", line = 2)
-		self.printGfxText("4px width, 6px height", line = 3)
-		self.redraw()
+		self.printText("The 4x6 font demo!")
+		self.printText("A custom font in gfx", line = 2)
+		self.printText("4px width, 6px height", line = 3)
 		sleep(1.0)
-		self.printGfxText("Please wait...", line = 3)
-		self.redraw()
+		self.printText("Please wait...", line = 3)
 		sleep(0.5)
 		for i in range(WIDTH // self._gfxFont['width']):
-			self.printGfxText(">".rjust(i + 1, '='), line = 4)
-			self.redraw()
+			self.printText(">".rjust(i + 1, '='), line = 4)
 			sleep(0.05)
-		self.printGfxText("Numbers:", line = 1)
-		self.printGfxText("0123456789-+=<>/", line = 2)
-		self.printGfxText("~!@#$%^&*()_,.;?", line = 3)
+		self.printText("Numbers:", line = 1)
+		self.printText("0123456789-+=<>/", line = 2, redraw = False)
+		self.printText("~!@#$%^&*()_,.;?", line = 3, redraw = False)
 		self.redraw()
 		self._demoGfxCountdown(init = True)
-		self.printGfxText("Lower cases:", line = 1)
-		self.printGfxText("abcdefghijklmnop", line = 2);
-		self.printGfxText("qrstuvwxyz", line = 3)
+		self.printText("Lower cases:", line = 1)
+		self.printText("abcdefghijklmnop", line = 2, redraw = False);
+		self.printText("qrstuvwxyz", line = 3, redraw = False)
 		self.redraw()
 		self._demoGfxCountdown(5)
-		self.printGfxText("Upper cases:", line = 1)
-		self.printGfxText("ABCDEFGHIJKLMNOP", line = 2);
-		self.printGfxText("QRSTUVWXYZ", line = 3)
+		self.printText("Upper cases:", line = 1)
+		self.printText("ABCDEFGHIJKLMNOP", line = 2, redraw = False);
+		self.printText("QRSTUVWXYZ", line = 3, redraw = False)
 		self.redraw()
 		self._demoGfxCountdown(5)
 
 	def _demo6x8(self):
 		self.clearScreen()
-		self.setGraphicMode()
+		self.setGfxMode()
 		self.clearScreen(0)
 		self.redraw()
 		sleep(0.5)
 		self.setGfxFont('6x8')
 		#6x8 font ruler:  "---------------------"
-		self.printGfxText("The 6x8 font demo!")
-		self.printGfxText("A custom font in gfx", line = 2)
-		self.printGfxText("6px width, 8px height", line = 3)
-		self.redraw()
+		self.printText("The 6x8 font demo!")
+		self.printText("A custom font in gfx", line = 2)
+		self.printText("6px width, 8px height", line = 3)
 		sleep(1.0)
-		self.printGfxText("Please wait...", line = 3)
-		self.redraw()
+		self.printText("Please wait...", line = 3)
 		sleep(0.5)
 		for i in range(WIDTH // self._gfxFont['width']):
-			self.printGfxText(">".rjust(i + 1, '='), line = 4)
-			self.redraw()
+			self.printText(">".rjust(i + 1, '='), line = 4)
 			sleep(0.05)
-		self.printGfxText("Numbers:", line = 1)
-		self.printGfxText("0123456789-+=<>/", line = 2)
-		self.printGfxText("~!@#$%^&*()_,.;?", line = 3)
+		self.printText("Numbers:", line = 1)
+		self.printText("0123456789-+=<>/", line = 2, redraw = False)
+		self.printText("~!@#$%^&*()_,.;?", line = 3, redraw = False)
 		self.redraw()
 		self._demoGfxCountdown(init = True)
-		self.printGfxText("Lower cases:", line = 1)
-		self.printGfxText("abcdefghijklmnop", line = 2);
-		self.printGfxText("qrstuvwxyz", line = 3)
+		self.printText("Lower cases:", line = 1)
+		self.printText("abcdefghijklmnop", line = 2, redraw = False);
+		self.printText("qrstuvwxyz", line = 3, redraw = False)
 		self.redraw()
 		self._demoGfxCountdown(5)
-		self.printGfxText("Upper cases:", line = 1)
-		self.printGfxText("ABCDEFGHIJKLMNOP", line = 2);
-		self.printGfxText("QRSTUVWXYZ", line = 3)
+		self.printText("Upper cases:", line = 1)
+		self.printText("ABCDEFGHIJKLMNOP", line = 2, redraw = False);
+		self.printText("QRSTUVWXYZ", line = 3, redraw = False)
 		self.redraw()
 		self._demoGfxCountdown(5)
 
-	def _demoGraphic(self):
+	def _demoGfx(self):
 		self.clearScreen()
-		self.setGraphicMode()
+		self.setGfxMode()
 		self.clearScreen(0)
 		self.redraw()
 		sleep(0.5)
 		# Draw screen borders with 1 pixel width.
 		for x in range(128):
-			self.plot(x, 0)
+			self.plot(x, 0, False)
 		for y in range(1, 64):
-			self.plot(127, y)
+			self.plot(127, y, False)
 		for x in range(126, -1, -1):
-			self.plot(x, 63)
+			self.plot(x, 63, False)
 		for y in range(62, 0, -1):
-			self.plot(0, y)
+			self.plot(0, y, False)
 		self.redraw()
 		# Draw diagonal lines.
 		for x in range(128):
-				self.plot(x, x // 2)
-				self.plot(127 - x, x // 2)
+				self.plot(x, x // 2, False)
+				self.plot(127 - x, x // 2, False)
 		self.redraw()
 		sleep(1)
+
+	def _newTextBuf(self, lines, width):
+		"""Return a space filled text buffer with given number of lines and width."""
+		buf = [[' '] * width for i in range(lines)]
+		return buf
+
+	def printText(self, text, line = 1, col = 1, fillChar = ' ', redraw = True): 
+		"""Print a text at the given line and column. Missing character will be 
+		filled with fillChar, default is space. If fillChar is None, then the text
+		will be printed as-is"""
+		if self._textMode:
+			self._printText(text, line, col, fillChar)
+		else:
+			self._printGfxText(text, line, col, fillChar)
+			if redraw:
+				self.redraw()
+
+	def setGfxFont(self, name):
+		for s in self._gfxFonts:
+			if s == name:
+				self._gfxFont = self._gfxFonts[s]
+	
+	def listGfxFonts(self):
+		for s in self._gfxFonts:
+			print(s, end = '')
+		print('')
+
+	def clearTextLine(self, line):
+		"""Clear given line of text by filling it with spaces"""
+		self.printText('', line)
 
 	def demo(self, option = "all"):
 		self.init()
@@ -480,7 +521,7 @@ class ST7920HSPI(BaseLCD):
 			self.clearScreen()
 			self.printText("To graphic mode", line = 1)
 			self._demoCountdown(init = True, duration = 3)
-			self._demoGraphic()
+			self._demoGfx()
 			self._demo4x6()
 			self._demo6x8()
 			self.setTextMode()
@@ -491,37 +532,9 @@ class ST7920HSPI(BaseLCD):
 			self.clearScreen()
 			self.backlight(False)
 		elif option == "gfx":
-			self._demoGraphic()
+			self._demoGfx()
 		elif option == "4x6":
 			self._demo4x6()
 		elif option == "6x8":
 			self._demo6x8()
 
-	def _newTextBuf(self, lines, width):
-		"""Return a space filled text buffer with given number of lines and width."""
-		buf = [[' '] * width for i in range(lines)]
-		return buf
-
-	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24):
-		super().__init__(driver = "ST7290", e = e, rw = rw, rst = rst, bla = bla,
-				columns = 16, lines = 4, width = 128, height = 64)
-		self._debug = False
-		self._txMode = None
-		GPIO.setwarnings(False)
-		GPIO.setmode(GPIO.BCM)
-		if self._bla is not None:
-			GPIO.setup(self._bla, GPIO.OUT)
-		# Instantiate the SPI object.
-		self._spi = spidev.SpiDev()
-		self._spi.open(0, 0)
-		self._spi.max_speed_hz = SPI_SPEED
-		self._spi.no_cs = True
-		# Default to text mode with 8x16 HCGROM font, 4 lines, 16 letters width.
-		self._textMode = True
-		self._hcgrom = True
-		self._gfxBuf = [[0] * 17 for i in range(64)]
-		self._textBuf = self._newTextBuf(FONT8x16_LINES, FONT8x16_COLS)
-		# List of supported fonts.
-		self._gfxFonts = {'default' : font6x8, '6x8' : font6x8, '4x6' : font4x6}
-		# Default font for printing text in gfx mode.
-		self._gfxFont = self._gfxFonts['default']
