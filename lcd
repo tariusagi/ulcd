@@ -4,6 +4,8 @@ import sys
 import getopt
 import subprocess
 from time import sleep
+import socket
+import re
 
 VERSION = "0.1"
 PROGRAM = os.path.basename(__file__)
@@ -11,31 +13,33 @@ USAGE = f"""\
 {PROGRAM} version {VERSION}.
 Display text or graphic to an attached LCD.
 Syntax: {PROGRAM} [OPTION] [TEXT]
-OPTION:
--B      Turn backlight on.
--b      Turn backlight off.
--d op   Run a demo with option op (default "all") and ignore all other options.
--f name Use given font name (if supported).
--h      Display this help and exit.
--g      Use graphic mode (if supported).
--i      Initialize/reset LCD (effectively clear the screen).
--p      Print LCD parameters.
--t      LCD type (required). See supported types below.
--x      Clear the LCD screen.
--r      Restore GPIO settings (default is not).
--l n    Move text cursor to line n (start from 1, default 1).
--c n    Move text cursor to column n (if supported, start from 1, default 1).
-
-Supported LCD are:
+Common options:
+-h           Display this help and exit.
+-L host:port Listen on "host:port" for client connections (the daemon mode).
+Device options:
+-t           LCD type (required). See supported types below.
+-i           Initialize/reset LCD (effectively clear the screen).
+-x           Clear the screen.
+-r           Restore/cleanup GPIO settings (default is not) upon termination..
+-B           Turn backlight on.
+-b           Turn backlight off.
+-d opt       Run a demo name "opt" (default "all") and ignore all other options.
+-g           Use graphic mode (if supported).
+-p           Print LCD parameters.
+Text options:
+-f font      Use given font named "font" (if supported).
+-l line      Set text line before printing (start from 1, default 1).
+-c column    Set text column before printing (start from 1, default 1).
+Supported LCD types:
 - st7920: 128x64 graphic LCD, ST7920 chip, 8 lines 21 characters, 6x8 font.
 - hd44780: 16x2 character LCD, HD44780 chip, 2 lines 16 characters, 5x8 font.
 - hd44780opi: it is hd44780 written for Orange Pi boards.
-
-Supported fonts are:
+Supported fonts:
 - st7920: 4x6, 6x8 (default).
 """
 
 def main():
+	global lcd
 	# Default settings.
 	lcdType = None
 	init = False
@@ -49,7 +53,8 @@ def main():
 	line = 1
 	col = 1
 	cleanup = False
-	lcd = None
+	host = None
+	port = None
 
 	# Process command line arguments.
 	if len(sys.argv) == 1:
@@ -57,7 +62,7 @@ def main():
 		sys.exit(0)
 	# Handle commandline arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], 'bBc:d:f:ghil:prst:x')
+		opts, args = getopt.getopt(sys.argv[1:], 'bBc:d:f:ghil:L:prst:x')
 	except getopt.error as err:
 		print(f'ERROR: {str(err)}. Use "-h" for usage.', file = sys.stderr)
 		sys.exit(1)
@@ -81,6 +86,9 @@ def main():
 			init = True
 		elif o == '-l':
 			line = int(v)
+		elif o == '-L':
+			host, port = v.split(':')
+			port = int(port)
 		elif o == '-p':
 			printParams = True
 		elif o == '-r':
@@ -119,29 +127,79 @@ def main():
 	if lcd is None:
 		print('ERROR: Unable to initialize an LCD.', file = sys.stderr)
 		sys.exit(4)
+
+	if printParams:
+		lcd.printParams()
+	if demo:
+		lcd.demo(option = demo)
+		sys.exit(0)
+	if init:
+		lcd.init()
+	if backlight is not None:
+		lcd.backlight(backlight)
+	if gfx:
+		lcd.setGfxMode()
 	else:
-		if printParams:
-			lcd.printParams()
-		if demo:
-			lcd.demo(option = demo)
-			sys.exit(0)
-		if init:
-			lcd.init()
-		if backlight is not None:
-			lcd.backlight(backlight)
-		if gfx:
-			lcd.setGfxMode()
-		else:
-			lcd.setTextMode()
-		if font is not None:
-			lcd.setGfxFont(font)
-		if clear:
-			lcd.clearScreen()
-		if len(text):
-			lcd.printText(text, line = line, col = col)
-		if cleanup:
-			lcd.cleanup()
+		lcd.setTextMode()
+	if font is not None:
+		lcd.setGfxFont(font)
+	if clear:
+		lcd.clearScreen()
+	if len(text):
+		lcd.printText(text, line = line, col = col)
+	if cleanup:
+		# TODO: handle this.
+		pass
  
+	if host is not None:
+		# Daemon mode.
+		print("Activating daemon mode on %s:%s" % (host, port))
+		lcd.clearScreen()
+		lcd.printText("LCD started")
+		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+			s.bind((host, port))
+			s.listen()
+			quit = False
+			while not quit:
+				conn, addr = s.accept()
+				print('Connected by', addr)
+				with conn:
+					data = conn.recv(1024)
+					if not data:
+						break
+					# Extract the command.
+					msg = data.decode('ascii').strip()
+					print(f"Received \"{msg}\" from {addr}.")
+					try:
+						cmd, args = msg.split(' ', 1)
+						print(f"Command = \"{cmd}\", args = \"{args}\".")
+					except ValueError:
+						cmd = msg
+						print(f"Command = \"{cmd}\".")
+					# Handle the extracted command.
+					if cmd == "quit":
+						# Terminate.
+						print("CMD: terminate.")
+						lcd.clearScreen()
+						lcd.printText("LCD terminated")
+						quit = True
+					elif cmd == "clear":
+						print("CMD: clear.")
+						lcd.clearScreen()
+					else:
+						m = re.match('^line([0-9]+)', cmd)
+						if m:
+							line = int(m.groups()[0])
+							print(f"CMD: line {line}, text = \"{args}\"")
+							lcd.printText(args, line = line)
+							continue
+					conn.sendall("OK\n".encode())
+					conn.shutdown(socket.SHUT_RDWR)
+					conn.close()
+			s.shutdown(socket.SHUT_RDWR)
+			s.close()
+
 if __name__ == '__main__':
 	main()
 

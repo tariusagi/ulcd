@@ -12,26 +12,28 @@ Usage:
 
 ```txt
 Syntax: lcd [OPTION] [TEXT]
-OPTION:
--B      Turn backlight on.
--b      Turn backlight off.
--d op   Run a demo with option op (default "all") and ignore all other options.
--f name Use given font name (if supported).
--h      Display this help and exit.
--i      Initialize/reset LCD (effectively clear the screen).
--p      Print LCD parameters.
--t      LCD type (required). See supported types below.
--x      Clear the LCD screen.
--r      Restore GPIO settings (default is not).
--l n    Move text cursor to line n (start from 1, default 1).
--c n    Move text cursor to column n (if supported, start from 1, default 1).
-
-Supported LCD are:
+Common options:
+-h           Display this help and exit.
+-L host:port Listen on "host:port" for client connections (the daemon mode).
+Device options:
+-t           LCD type (required). See supported types below.
+-i           Initialize/reset LCD (effectively clear the screen).
+-x           Clear the screen.
+-r           Restore/cleanup GPIO settings (default is not) upon termination..
+-B           Turn backlight on.
+-b           Turn backlight off.
+-d opt       Run a demo name "opt" (default "all") and ignore all other options.
+-g           Use graphic mode (if supported).
+-p           Print LCD parameters.
+Text options:
+-f font      Use given font named "font" (if supported).
+-l line      Set text line before printing (start from 1, default 1).
+-c column    Set text column before printing (start from 1, default 1).
+Supported LCD types:
 - st7920: 128x64 graphic LCD, ST7920 chip, 8 lines 21 characters, 6x8 font.
 - hd44780: 16x2 character LCD, HD44780 chip, 2 lines 16 characters, 5x8 font.
 - hd44780opi: it is hd44780 written for Orange Pi boards.
-
-Supported fonts are:
+Supported fonts:
 - st7920: 4x6, 6x8 (default).
 ```
 
@@ -115,6 +117,12 @@ sudo systemctl start lcdserver
 ```
 
 To start the server as a service.
+
+An alternative method is to run `lcd` in daemon mode (`-L` option), such as change `ExecStart` line above with:
+
+```systemd
+ExecStart=/usr/local/bin/lcd -t st7920 -L 0.0.0.0:1234
+```
 
 ## st7920.py
 
