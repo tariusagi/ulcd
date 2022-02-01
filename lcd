@@ -6,6 +6,7 @@ import subprocess
 from time import sleep
 import socket
 import re
+import signal
 
 VERSION = "0.1"
 PROGRAM = os.path.basename(__file__)
@@ -38,8 +39,15 @@ Supported fonts:
 - st7920: 4x6, 6x8 (default).
 """
 
+quit = False
+
+def onExit(*args):
+	global quit
+	print("SIGINT or SIGNTERM received.")
+	quit = True
+
 def main():
-	global lcd
+	global quit
 	# Default settings.
 	lcdType = None
 	init = False
@@ -153,6 +161,8 @@ def main():
  
 	if host is not None:
 		# Daemon mode.
+		signal.signal(signal.SIGINT, onExit)
+		signal.signal(signal.SIGTERM, onExit)
 		print("Activating daemon mode on %s:%s" % (host, port))
 		lcd.clearScreen()
 		lcd.printText("LCD started")
@@ -160,7 +170,6 @@ def main():
 			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 			s.bind((host, port))
 			s.listen()
-			quit = False
 			while not quit:
 				conn, addr = s.accept()
 				print('Connected by', addr)
@@ -181,12 +190,13 @@ def main():
 					if cmd == "quit":
 						# Terminate.
 						print("CMD: terminate.")
-						lcd.clearScreen()
-						lcd.printText("LCD terminated")
 						quit = True
 					elif cmd == "clear":
 						print("CMD: clear.")
 						lcd.clearScreen()
+					elif cmd == "font":
+						print("CMD: font.")
+						lcd.setGfxFont(args)
 					else:
 						m = re.match('^line([0-9]+)', cmd)
 						if m:
@@ -199,6 +209,8 @@ def main():
 					conn.close()
 			s.shutdown(socket.SHUT_RDWR)
 			s.close()
+			lcd.clearScreen()
+			lcd.printText("LCD terminated")
 
 if __name__ == '__main__':
 	main()

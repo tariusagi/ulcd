@@ -37,7 +37,53 @@ Supported fonts:
 - st7920: 4x6, 6x8 (default).
 ```
 
+To run this program as a daemon at boot, use `/etc/rc.local` or create a service file `/etc/systemd/system/lcd.service` like this (assumming path to this program is at `/usr/local/bin/lcd`):
+
+```systemd
+[Unit]
+Description=Listen and display on attached LCD
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=peter
+Group=peter
+ExecStart=/usr/local/bin/lcd -t st7920 -L 0.0.0.0:1234
+ExecReload=/bin/bash -c 'echo clear | nc -w1 127.0.0.1 1234'
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=default.target
+```
+
+Then run:
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable lcd
+sudo systemctl start lcd
+```
+
+To start the daemon as a service.
+
+To send command to this server, use `nc`, `ncat` or nay network client. For example, the following commands tell the server to clear the LCD and then print "Hello World" in line 2:
+
+```sh
+echo clear | nc -w1 127.0.0.1 1234
+echo line2 Hello World | nc -w1 127.0.0.1 1234
+```
+
+Supported commands are:
+
+- `quit`: terminate the daemon.
+- `clear`: Clear the LCD.
+- `lineN text`: Show the "text" on the LCD's line N.
+- `font name`: Change LCD font to "name" (depends on the LCD type).
+
 ## lcdserver
+
+*This program is obsolete. Use `lcd` in daemon mode instead (see above).*
 
 A Bash script to run a network server and serve requests from clients to control the attached LCD. Requires root priviledge.
 
@@ -53,40 +99,10 @@ where:
 -t type Set the LCD type for "lcd" command. Run "lcd -h" for help.
 ```
 
-To send command to this server, use `nc`, `ncat` or nay network client. For example, the following command tell the server to clear the LCD:
-
-```sh
-echo clear | nc -w1 127.0.0.1 1234
-```
-
-or create a text file containing commands and send it over. For example, with this `cmd.txt`:
-
-```
-clear
-line1 First line
-line2 Second line
-display
-```
-
-Run this command to send the commands in that file to the server:
-
-```sh
-nc -w1 127.0.0.1 1234 < cmd.txt
-```
-
-And the server will do the following:
-
-- Clear the LCD.
-- Put "First line" to line 1 buffer.
-- Put "Second line" to line 2 buffer.
-- Display the buffer on the LCD.
-
-Supported commands are:
+How to send them to this server please refer to `lcd` daemon mode section above. This program may not support all commands that `lcd` daemon can. The current supported commands are:
 
 - `clear`: Clear the LCD.
-- `line1` text: Show the text on the LCD's first line.
-- `line2` text: Show the text on the LCD's second line.
-- `display`: display line 1 and line 2 on the LCD.
+- `lineN text`: Show the text on the LCD's line N.
 
 To run this server at boot, use `/etc/rc.local` or create a service file `/etc/systemd/system/lcdserver.service` like this (assumming path to this server is at `/usr/local/bin/lcdserver`):
 
@@ -117,12 +133,6 @@ sudo systemctl start lcdserver
 ```
 
 To start the server as a service.
-
-An alternative method is to run `lcd` in daemon mode (`-L` option), such as change `ExecStart` line above with:
-
-```systemd
-ExecStart=/usr/local/bin/lcd -t st7920 -L 0.0.0.0:1234
-```
 
 ## st7920.py
 
