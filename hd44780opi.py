@@ -81,6 +81,9 @@ class HD44780OPiH616(BaseLCD):
 		self._sendByte(0x28, CMD_MODE) # Set 4 bits interface with 2 lines.
 		self._sendByte(0x0C, CMD_MODE) # Display On,Cursor Off, Blink Off
 	 
+	def setTextMode(self):	
+		return True
+
 	def clearScreen(self):
 		self._sendByte(0x01,CMD_MODE) # Clear display
 		sleep(0.01)
