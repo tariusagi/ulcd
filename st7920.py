@@ -20,8 +20,8 @@ WRITE_DELAY = 72
 CMD = 0
 DATA = 1
 # Default text mode font settings.
-FONT8x16_LINES = 4
-FONT8x16_COLS = 16
+HCGROM_LINES = 4
+HCGROM_COLS = 16
 # Graphic mode settings.
 WIDTH = 128
 HEIGHT = 64
@@ -68,26 +68,12 @@ class ST7920HSPI(BaseLCD):
 		self._textMode = True
 		self._hcgrom = True
 		self._gfxBuf = [[0] * 17 for i in range(64)]
-		self._textBuf = self._newTextBuf(FONT8x16_LINES, FONT8x16_COLS)
+		self._textBuf = self._newTextBuf(HCGROM_LINES, HCGROM_COLS)
 		# List of supported fonts.
 		self._gfxFonts = {'default' : font6x8, '6x8' : font6x8, '4x6' : font4x6}
 		# Default font for printing text in gfx mode.
 		self._gfxFont = self._gfxFonts['default']
 
-	def _pulse(self):
-		GPIO.output(self._e, GPIO.HIGH)
-		GPIO.output(self._e, GPIO.LOW)
-
-	def _pulse4(self):
-		for i in range(4):
-			GPIO.output(self._e, GPIO.HIGH)
-			GPIO.output(self._e, GPIO.LOW)
-
-	def _pulse5(self):
-		for i in range(5):
-			GPIO.output(self._e, GPIO.HIGH)
-			GPIO.output(self._e, GPIO.LOW)
-  
 	def _setRw(self, state):
 		GPIO.output(self._rw, state)
 
@@ -230,7 +216,7 @@ class ST7920HSPI(BaseLCD):
 		if self._textMode: 
 			self._setMode(CMD)
 			self._sendByte(0x01, 1600)
-			self._textBuf = self._newTextBuf(FONT8x16_LINES, FONT8x16_COLS)
+			self._textBuf = self._newTextBuf(HCGROM_LINES, HCGROM_COLS)
 		else:
 			# Reset internal graphic buffer.
 			self._gfxBuf = [[pattern] * 17 for i in range(64)]
@@ -280,15 +266,15 @@ class ST7920HSPI(BaseLCD):
 		will be printed as-is"""
 		if not self._textMode:
 			return
-		if line < 1 or line > FONT8x16_LINES or col < 1 or col > FONT8x16_COLS:
+		if line < 1 or line > HCGROM_LINES or col < 1 or col > HCGROM_COLS:
 			# Ignore invalid position.
 			return
 		if fillChar is not None:
-			text = self._fillTextLine(text, col, FONT8x16_COLS, fillChar)
+			text = self._fillTextLine(text, col, HCGROM_COLS, fillChar)
 			col = 1
 		# Trim text longer than display.
-		if (len(text) + col - 1 > FONT8x16_COLS):
-			text = text[0:FONT8x16_COLS - col + 1]
+		if (len(text) + col - 1 > HCGROM_COLS):
+			text = text[0:HCGROM_COLS - col + 1]
 		# Merge into text buffer.
 		s = list(self._textBuf[line - 1])
 		for i in range(len(text)):
