@@ -30,7 +30,7 @@ OPTION:
   -s, --size=num              Size of font table (number of characters). Default
                               to maximum available from the input file.
   -k, --skip=num              Skip first num of characters.
-	-b, --background=num        Set the value of the background pixels.
+  -b, --background=num        Set the background color index (default 0).
 
 This program will print to stdout a Python source module, with comments telling
 the font's attributes, the font object itself, and a small code to pretty print
