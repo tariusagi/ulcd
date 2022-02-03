@@ -30,11 +30,18 @@ class HD44780(BaseLCD):
 	K   - Ground (backlight kathode)
 	"""
 
-	def __init__(self, rs = 17, e = 27, bla = 16, 
-			d4 = 22, d5 = 5, d6 = 6, d7 = 26):
-		super().__init__(driver = "HD44780", 
-				e = e, rs = rs, bla = bla, d4 = d4, d5 = d5, d6 = d6, d7 = d7,
-				columns = 16, lines = 2)
+	def __init__(self, rs = 17, e = 27, bla = 16, d4 = 22, d5 = 5, d6 = 6,
+			d7 = 26, lines = 2, cols = 16):
+		super().__init__(driver = "HD44780")
+		self._rs = rs
+		self._e = e
+		self._bla = bla
+		self._d4 = d4
+		self._d5 = d5
+		self._d6 = d6
+		self._d7 = d7
+		self._maxLines = lines
+		self._maxCols = cols
 		GPIO.setwarnings(False)
 		GPIO.setmode(GPIO.BCM)
 		GPIO.setup(self._e, GPIO.OUT)
@@ -109,7 +116,6 @@ class HD44780(BaseLCD):
 			self._sendByte(ord(text[i]),DATA_MODE)
 
 	def backlight(self, state):
-		super().backlight(state)
 		if self._bla is not None:
 			GPIO.output(self._bla, state)
 

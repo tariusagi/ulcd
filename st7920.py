@@ -10,6 +10,8 @@ from baselcd import BaseLCD
 from font6x8 import font6x8
 from font4x6 import font4x6
 
+# Toggle debug mode.
+DEBUG = False
 # Serial transmission speed in Hz. Set to 1.93Mhz to be safe, but 15.6Mhz
 # (15600000Hz) tested working well on a Raspberry Pi Zero W.
 # on Raspberry Pi Zero W.
@@ -51,9 +53,11 @@ class ST7920HSPI(BaseLCD):
 	_gfxBuf = []
 
 	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24):
-		super().__init__(driver = "ST7290", e = e, rw = rw, rst = rst, bla = bla,
-				columns = 16, lines = 4, width = 128, height = 64)
-		self._debug = False
+		super().__init__(driver = "ST7290")
+		self._e = e
+		self._rw = rw
+		self._rst = rst
+		self._bla = bla
 		self._txMode = None
 		GPIO.setwarnings(False)
 		GPIO.setmode(GPIO.BCM)
@@ -73,9 +77,6 @@ class ST7920HSPI(BaseLCD):
 		self._gfxFonts = {'default' : font6x8, '6x8' : font6x8, '4x6' : font4x6}
 		# Default font for printing text in gfx mode.
 		self._gfxFont = self._gfxFonts['default']
-
-	def _setRw(self, state):
-		GPIO.output(self._rw, state)
 
 	def _sendByte(self, byte, delay = WRITE_DELAY):
 		"""Send one byte. Note that ST7920 requires 72us delay after each write."""
@@ -128,6 +129,7 @@ class ST7920HSPI(BaseLCD):
 
 	def _sendLine(self, y):
 		"""Send the whole line at y to the LCD."""
+		global DEBUG
 		# Check the whole dirty flag first.
 		if self._gfxBuf[y][16] == 0:
 			# This line is clean? Nothing to do.
@@ -136,7 +138,7 @@ class ST7920HSPI(BaseLCD):
 		buf = self._gfxBuf
 		flag = buf[y][16]
 		# Calculate range of data to send.
-		if self._debug:
+		if DEBUG:
 			debugMsg = ""
 		start = None
 		for i in range(8):
@@ -150,17 +152,17 @@ class ST7920HSPI(BaseLCD):
 					count += 1
 				if i == 7:
 					# Last bit? Send this last block.
-					if self._debug:
+					if DEBUG:
 						debugMsg += "(last)%d:%d " % (start, count)
 					self._sendBlock(buf[y], y, start, count) 
 			elif start is not None:
 				# End of a block? Send it!
-				if self._debug:
+				if DEBUG:
 					debugMsg += "%d:%d " % (start, count)
 				self._sendBlock(buf[y], y, start, count) 
 				# Reset block marker.
 				start = None
-		if self._debug:
+		if DEBUG:
 			print("%02d: %s flag %s blocks %s" % 
 					(y, ' '.join(map(lambda n: format(n, "08b"), buf[y][0:16])),
 						format(flag, "08b"),
@@ -177,7 +179,6 @@ class ST7920HSPI(BaseLCD):
 		return text
 
 	def backlight(self, state):
-		super().backlight(state)
 		if self._bla is not None:
 			GPIO.output(self._bla, state)
 

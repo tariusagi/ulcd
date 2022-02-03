@@ -32,10 +32,17 @@ class HD44780OPiH616(BaseLCD):
 	"""
 
 	def __init__(self, rs = 26, e = 24, bla = 10, 
-			d4 = 22, d5 = 18, d6 = 16, d7 = 12):
-		super().__init__(driver = "HD44780", 
-				e = e, rs = rs, bla = bla, d4 = d4, d5 = d5, d6 = d6, d7 = d7,
-				columns = 16, lines = 2)
+			d4 = 22, d5 = 18, d6 = 16, d7 = 12, cols = 16, lines = 2):
+		super().__init__(driver = "HD44780")
+		self._rs = rs
+		self._e = e
+		self._bla = bla
+		self._d4 = d4
+		self._d5 = d5
+		self._d6 = d6
+		self._d7 = d7
+		self._maxLines = lines
+		self._maxCols = cols
 		GPIO.setboard(GPIO.H616)
 		GPIO.setwarnings(False)
 		GPIO.setmode(GPIO.BOARD)
@@ -110,7 +117,6 @@ class HD44780OPiH616(BaseLCD):
 			self._sendByte(ord(text[i]),DATA_MODE)
 
 	def backlight(self, state):
-		super().backlight(state)
 		if self._bla is not None:
 			GPIO.output(self._bla, state)
 
