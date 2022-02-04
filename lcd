@@ -26,6 +26,11 @@ Device options:
 -b           Turn backlight off.
 -d opt       Run a demo name "opt" (default "all") and ignore all other options.
 -g           Use graphic mode (if supported).
+-z freq      Set LCD communication speed in Hz (if supported) or "-" to revert
+             to default value (1953000, 1.95Mhz). A 39.9Mhz (39900000Hz)
+						 frequency was tested working well on a Raspberry Pi Zero W.
+-w usec      Set delay in microsecond between writes to LCD (if supported) or
+             "-" to revert to default value (72).
 -p           Print LCD parameters.
 Text options:
 -f font      Use given font named "font" (if supported).
@@ -36,7 +41,7 @@ Supported LCD types:
 - hd44780: 16x2 character LCD, HD44780 chip, 2 lines 16 characters, 5x8 font.
 - hd44780opi: it is hd44780 written for Orange Pi boards.
 Supported fonts:
-- st7920: 4x6, 6x8 (default).
+- st7920: 4x6, 5x6, 6x8 (default).
 """
 
 quit = False
@@ -63,6 +68,8 @@ def main():
 	cleanup = False
 	host = None
 	port = None
+	freq = None
+	writeDelay = None
 
 	# Process command line arguments.
 	if len(sys.argv) == 1:
@@ -70,7 +77,7 @@ def main():
 		sys.exit(0)
 	# Handle commandline arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], 'bBc:d:f:ghil:L:prst:x')
+		opts, args = getopt.getopt(sys.argv[1:], 'bBc:d:f:ghil:L:prst:xz:w:')
 	except getopt.error as err:
 		print(f'ERROR: {str(err)}. Use "-h" for usage.', file = sys.stderr)
 		sys.exit(1)
@@ -107,6 +114,10 @@ def main():
 			lcdType = v.lower()
 		elif o == '-x':
 			clear = True
+		elif o == '-z':
+			freq = v
+		elif o == '-w':
+			writeDelay = v
 		else:
 			print('ERROR: Unknown option. Use "-h" for usage.', file = sys.stderr);
 			sys.exit(2)
@@ -138,13 +149,17 @@ def main():
 
 	if printParams:
 		lcd.printParams()
-	if demo:
-		lcd.demo(option = demo)
-		sys.exit(0)
+	if freq is not None:
+		lcd.setFreq(None if freq == "-" else int(freq))
+	if writeDelay is not None:
+		lcd.setWriteDelay(None if writeDelay == "-" else int(writeDelay))
 	if init:
 		lcd.init()
 	if backlight is not None:
 		lcd.backlight(backlight)
+	if demo:
+		lcd.demo(option = demo)
+		sys.exit(0)
 	if gfx:
 		lcd.setGfxMode()
 	else:

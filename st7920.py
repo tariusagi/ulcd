@@ -13,8 +13,8 @@ from font5x6 import font5x6
 
 # Toggle debug mode.
 DEBUG = False
-# Serial transmission speed in Hz. Set to 1.93Mhz to be safe, but 15.6Mhz
-# (15600000Hz) tested working well on a Raspberry Pi Zero W.
+# Serial transmission speed in Hz. Set to 1.95Mhz to be safe, but 39.9Mhz
+# (39900000Hz) tested working well on a Raspberry Pi Zero W.
 # on Raspberry Pi Zero W.
 SPI_SPEED = 1953000
 # Default delay between writes to LCD's internal RAM (in microsecond).
@@ -53,7 +53,8 @@ class ST7920HSPI(BaseLCD):
 	# changes in the line, from MSB (first pair) to LSB (last pair).
 	_gfxBuf = []
 
-	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24):
+	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24, freq = SPI_SPEED,
+			writeDelay = WRITE_DELAY):
 		super().__init__(driver = "ST7290")
 		self._e = e
 		self._rw = rw
@@ -67,8 +68,9 @@ class ST7920HSPI(BaseLCD):
 		# Instantiate the SPI object.
 		self._spi = spidev.SpiDev()
 		self._spi.open(0, 0)
-		self._spi.max_speed_hz = SPI_SPEED
+		self._spi.max_speed_hz = freq
 		self._spi.no_cs = True
+		self._writeDelay = writeDelay
 		# Default to text mode with 8x16 HCGROM font, 4 lines, 16 letters width.
 		self._textMode = True
 		self._hcgrom = True
@@ -80,12 +82,14 @@ class ST7920HSPI(BaseLCD):
 		# Default font for printing text in gfx mode.
 		self._gfxFont = self._gfxFonts['default']
 
-	def _sendByte(self, byte, delay = WRITE_DELAY):
-		"""Send one byte. Note that ST7920 requires 72us delay after each write."""
+	def _sendByte(self, byte, delay = None):
+		"""Send one byte to the LCD. If delay is None, the internal value will be 
+		used."""
 		# A byte is sent as a pair of bytes:
 		# - First byte contains the 4 MSB and 4 "0".
 		# - Second byte contains the 4 LSB and 4 "0".
-		self._spi.xfer2([0xF0 & byte, 0xF0 & (byte << 4)], SPI_SPEED, delay, 8)
+		self._spi.xfer2([0xF0 & byte, 0xF0 & (byte << 4)], self._spi.max_speed_hz,
+				self._writeDelay if delay is None else delay, 8)
 
 	def _send2Bytes(self, first, second, delay = WRITE_DELAY):
 		"""Send 2 bytes. This is for convenience."""
@@ -186,6 +190,21 @@ class ST7920HSPI(BaseLCD):
 
 	def cleanup(self):
 		GPIO.cleanup()
+
+	def setWriteDelay(self, usec):
+		"""Set delay between byte writes in microseconds. Revert to default if usec 
+		is None"""
+		if usec is None:
+			self._writeDelay = WRITE_DELAY
+		else:
+			self._writeDelay = usec
+
+	def setFreq(self, freq):
+		"""Set SPI frequency. If freq is None, revert back to default."""
+		if freq is None:
+			self._spi.max_speed_hz = SPI_SPEED
+		else:
+			self._spi.max_speed_hz = freq
 
 	def init(self): 
 		"""Initialize LCD hardware basic registers and operation mode"""
@@ -394,6 +413,38 @@ class ST7920HSPI(BaseLCD):
 		self.redraw()
 		self._demoGfxCountdown(5)
 
+	def _demo5x6(self):
+		self.clearScreen()
+		self.setGfxMode()
+		self.clearScreen(0)
+		sleep(0.5)
+		self.setGfxFont('5x6')
+		#6x8 font ruler:  "---------------------"
+		self.printText("The 5x6 font demo!")
+		self.printText("A custom font in gfx", line = 2)
+		self.printText("5px width, 6px height", line = 3)
+		sleep(1.0)
+		self.printText("Please wait...", line = 3)
+		sleep(0.5)
+		for i in range(WIDTH // self._gfxFont['width']):
+			self.printText(">".rjust(i + 1, '='), line = 4)
+			sleep(0.05)
+		self.printText("Numbers:", line = 1)
+		self.printText("0123456789-+=<>/", line = 2, redraw = False)
+		self.printText("~!@#$%^&*()_,.;?", line = 3, redraw = False)
+		self.redraw()
+		self._demoGfxCountdown(init = True)
+		self.printText("Lower cases:", line = 1)
+		self.printText("abcdefghijklmnop", line = 2, redraw = False);
+		self.printText("qrstuvwxyz", line = 3, redraw = False)
+		self.redraw()
+		self._demoGfxCountdown(5)
+		self.printText("Upper cases:", line = 1)
+		self.printText("ABCDEFGHIJKLMNOP", line = 2, redraw = False);
+		self.printText("QRSTUVWXYZ", line = 3, redraw = False)
+		self.redraw()
+		self._demoGfxCountdown(5)
+
 	def _demo6x8(self):
 		self.clearScreen()
 		self.setGfxMode()
@@ -512,6 +563,7 @@ class ST7920HSPI(BaseLCD):
 			self._demoCountdown(init = True, duration = 3)
 			self._demoGfx()
 			self._demo4x6()
+			self._demo5x6()
 			self._demo6x8()
 			self.setTextMode()
 			self.printText("Turn off in  s", line = 4, col = 2)
@@ -524,6 +576,8 @@ class ST7920HSPI(BaseLCD):
 			self._demoGfx()
 		elif option == "4x6":
 			self._demo4x6()
+		elif option == "5x6":
+			self._demo5x6()
 		elif option == "6x8":
 			self._demo6x8()
 

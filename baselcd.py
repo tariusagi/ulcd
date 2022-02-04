@@ -10,6 +10,16 @@ class BaseLCD:
 		"""Set backlight on if state is True, or off if False."""
 		raise NotImplementedError
 
+	def setFreq(self, freq):
+		"""Set communication frequency (speed) in Hz. Revert to default if None was
+		given."""
+		raise NotImplementedError
+
+	def setWriteDelay(self, usec):
+		"""Set delay between byte writes in microsec. Revert to default if None was
+		given."""
+		raise NotImplementedError
+
 	def setTextMode(self):	
 		raise NotImplementedError
 
