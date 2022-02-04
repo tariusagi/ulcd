@@ -187,7 +187,7 @@ def main():
 		print("Activating daemon mode on %s:%s" % (host, port))
 		lcd.clearScreen()
 		lcd.backlight(True)
-		lcd.printText("LCD started")
+		lcd.printText("LCDSRV started")
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 			s.bind((host, port))
@@ -257,7 +257,7 @@ def main():
 			s.shutdown(socket.SHUT_RDWR)
 			s.close()
 			lcd.clearScreen()
-			lcd.printText("LCD terminated")
+			lcd.printText("LCDSRV stopped")
 			lcd.backlight(False)
 
 if __name__ == '__main__':
