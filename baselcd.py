@@ -3,15 +3,35 @@ import sys
 class BaseLCD:
 	"""Base class for all LCDs"""
 
-	def __init__(self, driver = "Base"):
+	def __init__(self, driver, width, height, columns, lines):
 		self._driver = driver
+		self._width = width
+		self._height = height
+		self._columns = columns
+		self._lines = lines
 
-	def debug(self, level):
-		"""Set debug mode level. Level 0 turn it off."""
+	@property
+	def width(self):
+		return self._width
+
+	@property
+	def height(self):
+		return self._height
+
+	@property
+	def columns(self):
+		return self._columns
+
+	@property
+	def lines(self):
+		return self._lines
+
+	def setDebug(self, level):
+		"""Set setDebug mode level. Level 0 turn it off."""
 		raise NotImplementedError
 
-	def backlight(self, state):
-		"""Set backlight on if state is True, or off if False."""
+	def setBacklight(self, state):
+		"""Set setBacklight on if state is True, or off if False."""
 		raise NotImplementedError
 
 	def setFreq(self, freq):

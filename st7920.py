@@ -22,8 +22,8 @@ DEFAULT_DELAY = 72
 CMD = 0
 DATA = 1
 # Default text mode font settings.
-HCGROM_LINES = 4
 HCGROM_COLS = 16
+HCGROM_LINES = 4
 # Graphic mode settings.
 WIDTH = 128
 HEIGHT = 64
@@ -54,7 +54,8 @@ class ST7920HSPI(BaseLCD):
 
 	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24, freq = SPI_SPEED,
 			writeDelay = DEFAULT_DELAY):
-		super().__init__(driver = "ST7290")
+		super().__init__(driver = "ST7290", width = WIDTH, height = HEIGHT,
+				columns = HCGROM_COLS, lines = HCGROM_LINES)
 		self._debug = 0
 		self._e = e
 		self._rw = rw
@@ -82,13 +83,13 @@ class ST7920HSPI(BaseLCD):
 		# Default font for printing text in gfx mode.
 		self._gfxFont = self._gfxFonts['default']
 
-	def debug(self, level):
-		"""Set debug level. Level 0 turn it off."""
+	def setDebug(self, level):
+		"""Set setDebug level. Level 0 turn it off."""
 		self._debug = level
 		if level > 0:
-			print("Set debug to level", level)
+			print("Set setDebug to level", level)
 		else:
-			print("Turn debug off")
+			print("Turn setDebug off")
 
 	def _sendByte(self, byte, delay = None):
 		"""Send one byte to the LCD. If delay is None, the internal value will be 
@@ -189,7 +190,7 @@ class ST7920HSPI(BaseLCD):
 			text = text.ljust(maxCols, fillChar)
 		return text
 
-	def backlight(self, state):
+	def setBacklight(self, state):
 		if self._bla is not None:
 			GPIO.output(self._bla, state)
 
@@ -225,6 +226,8 @@ class ST7920HSPI(BaseLCD):
 	def setTextMode(self):	
 		if not self._textMode:
 			self._textMode = True
+			self._columns = HCGROM_COLS
+			self._lines = HCGROM_LINES
 			self._setMode(CMD)
 			self._sendByte(0x34) # Extend instruction set
 			self._sendByte(0x34) # Graphic OFF
@@ -236,6 +239,8 @@ class ST7920HSPI(BaseLCD):
 	def setGfxMode(self):	
 		if self._textMode:
 			self._textMode = False
+			self._columns = self._width // self._gfxFont['width']
+			self._lines = self._height // self._gfxFont['height']
 			self._setMode(CMD)
 			self._sendByte(0x34) # Extend instruction set
 			self._sendByte(0x36) # Turn on graphic display.
@@ -338,8 +343,8 @@ class ST7920HSPI(BaseLCD):
 		if self._textMode:
 			return
 		font = self._gfxFont
-		LINES = HEIGHT // font['height']
-		COLS = WIDTH // font['width']
+		COLS = self._width // font['width']
+		LINES = self._height // font['height']
 		if line < 1 or line > LINES or col < 1 or col > COLS:
 			# Ignore invalid position.
 			return
@@ -401,7 +406,7 @@ class ST7920HSPI(BaseLCD):
 		sleep(1.0)
 		self.printText("Please wait...", line = 3)
 		sleep(0.5)
-		for i in range(WIDTH // self._gfxFont['width']):
+		for i in range(self._width // self._gfxFont['width']):
 			self.printText(">".rjust(i + 1, '='), line = 4)
 			sleep(0.05)
 		self.printText("Numbers:", line = 1)
@@ -433,7 +438,7 @@ class ST7920HSPI(BaseLCD):
 		sleep(1.0)
 		self.printText("Please wait...", line = 3)
 		sleep(0.5)
-		for i in range(WIDTH // self._gfxFont['width']):
+		for i in range(self._width // self._gfxFont['width']):
 			self.printText(">".rjust(i + 1, '='), line = 4)
 			sleep(0.05)
 		self.printText("Numbers:", line = 1)
@@ -466,7 +471,7 @@ class ST7920HSPI(BaseLCD):
 		sleep(1.0)
 		self.printText("Please wait...", line = 3)
 		sleep(0.5)
-		for i in range(WIDTH // self._gfxFont['width']):
+		for i in range(self._width // self._gfxFont['width']):
 			self.printText(">".rjust(i + 1, '='), line = 4)
 			sleep(0.05)
 		self.printText("Numbers:", line = 1)
@@ -528,6 +533,8 @@ class ST7920HSPI(BaseLCD):
 		for s in self._gfxFonts:
 			if s == name:
 				self._gfxFont = self._gfxFonts[s]
+				self._columns = self._width // self._gfxFont['width']
+				self._lines = self._height // self._gfxFont['height']
 	
 	def listGfxFonts(self):
 		for s in self._gfxFonts:
@@ -540,7 +547,7 @@ class ST7920HSPI(BaseLCD):
 
 	def demo(self, option = "all"):
 		self.init()
-		self.backlight(True)
+		self.setBacklight(True)
 
 		if option == "all":
 			# 16 char ruler"----------------"
@@ -578,7 +585,7 @@ class ST7920HSPI(BaseLCD):
 				self.printText(str(i), line = 4, col = 14, fillChar = None)
 				sleep(1.0)
 			self.clearScreen()
-			self.backlight(False)
+			self.setBacklight(False)
 		elif option == "gfx":
 			self._demoGfx()
 		elif option == "4x6":

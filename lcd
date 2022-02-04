@@ -32,6 +32,7 @@ Device options:
 -w usec      Set delay in microsecond between writes to LCD (if supported) or
              "-" to revert to default value (72).
 -p           Print LCD parameters.
+-s           Show LCD server status at the last line.
 -v n         Verbose/debug level. Debug messages will be sent to stderr.
 Text options:
 -f font      Use given font named "font" (if supported).
@@ -72,6 +73,7 @@ def main():
 	freq = None
 	writeDelay = None
 	debug = 0
+	status = False
 
 	# Process command line arguments.
 	if len(sys.argv) == 1:
@@ -111,7 +113,7 @@ def main():
 		elif o == '-r':
 			cleanup = True
 		elif o == '-s':
-			softClock = True
+			status = True
 		elif o == '-t':
 			lcdType = v.lower()
 		elif o == '-x':
@@ -162,7 +164,7 @@ def main():
 	if init:
 		lcd.init()
 	if backlight is not None:
-		lcd.backlight(backlight)
+		lcd.setBacklight(backlight)
 	if demo:
 		lcd.demo(option = demo)
 		sys.exit(0)
@@ -186,79 +188,81 @@ def main():
 		signal.signal(signal.SIGTERM, onExit)
 		print("Activating daemon mode on %s:%s" % (host, port))
 		lcd.clearScreen()
-		lcd.backlight(True)
-		lcd.printText("LCDSRV started")
+		lcd.setBacklight(True)
+		if status: lcd.printText(">LCDSRV started", line = lcd.lines)
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 			s.bind((host, port))
 			s.listen()
 			while not quit:
 				conn, addr = s.accept()
-				print('Connected by', addr)
+				if debug > 0: print('Connected by', addr)
+				if status: lcd.printText(f">Conn {addr[0]}", line = lcd.lines)
 				with conn:
 					data = conn.recv(1024)
 					if not data:
+						if status: lcd.printText(f">{addr[0]} no data", line = lcd.lines)
 						break
 					# Extract the command.
 					msg = data.decode('ascii').strip()
-					print(f"Received \"{msg}\" from {addr}.")
+					if debug > 0: print(f"Received \"{msg}\" from {addr[0]}.")
 					try:
 						cmd, args = msg.split(' ', 1)
-						print(f"Command = \"{cmd}\", args = \"{args}\".")
+						if debug > 0: print(f"Command = \"{cmd}\", args = \"{args}\".")
 					except ValueError:
 						cmd = msg
-						print(f"Command = \"{cmd}\", no args.")
+						if debug > 0: print(f"Command = \"{cmd}\", no args.")
 					# Handle the extracted command.
 					if cmd == "quit":
 						# Terminate.
-						print("Terminate.")
+						if debug > 0: print("Terminate.")
 						quit = True
 					if cmd == "debug":
-						print("Set debug level", debug)
+						if debug > 0: print("Set debug level", debug)
 						lcd.debug(debug)
 					elif cmd == "clear":
-						print("Clear screen.")
+						if debug > 0: print("Clear screen.")
 						lcd.clearScreen()
 					elif cmd == "backlight":
 						if args == "on":
-							print("Turn backlight on.")
-							lcd.backlight(True)
+							if debug > 0: print("Turn backlight on.")
+							lcd.setBacklight(True)
 						elif args == "off":
-							print("Turn backlight off.")
-							lcd.backlight(False)
+							if debug > 0: print("Turn backlight off.")
+							lcd.setBacklight(False)
 					elif cmd == "freq":
 						if args == "-":
-							print("Set frequency to LCD's default.")
+							if debug > 0: print("Set frequency to LCD's default.")
 							lcd.setFreq(None)
 						else:
-							print("Set frequency to %sHz" % int(args))
+							if debug > 0: print("Set frequency to %sHz" % int(args))
 							lcd.setFreq(int(args))
 					elif cmd == "delay":
 						if args == "-":
-							print("Set write delay to LCD's default.")
+							if debug > 0: print("Set write delay to LCD's default.")
 							lcd.setWriteDelay(None)
 						else:
-							print("Set write delay to %s usec" % int(args))
+							if debug > 0: print("Set write delay to %s usec" % int(args))
 							lcd.setWriteDelay(int(args))
-						print("Current write delay is %d usec." % lcd._writeDelay)
 					elif cmd == "font":
-						print("Set font to", args)
+						if debug > 0: print("Set font to", args)
 						lcd.setGfxFont(args)
 					else:
 						m = re.match('^line([0-9]+)', cmd)
 						if m:
 							line = int(m.groups()[0])
-							print(f"Print at line {line} text = \"{args}\".")
+							if debug > 0: print(f"Print at line {line} text = \"{args}\".")
 							lcd.printText(args, line = line)
 							continue
 					conn.sendall("OK\n".encode())
 					conn.shutdown(socket.SHUT_RDWR)
 					conn.close()
+					if status: lcd.printText(f">{addr[0]} closed", line = lcd.lines)
 			s.shutdown(socket.SHUT_RDWR)
 			s.close()
 			lcd.clearScreen()
-			lcd.printText("LCDSRV stopped")
-			lcd.backlight(False)
+			if status: lcd.printText(f">LCDSRV stopped", line = lcd.lines)
+			lcd.setBacklight(False)
 
 if __name__ == '__main__':
 	main()

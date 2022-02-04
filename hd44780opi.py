@@ -27,8 +27,8 @@ class HD44780OPiH616(BaseLCD):
   D5  - 18
   D6  - 16
   D7  - 12
-	A   - 10 (backlight anode) 
-	K   - Ground (backlight kathode)
+	A   - 10 (setBacklight anode) 
+	K   - Ground (setBacklight kathode)
 	"""
 
 	def __init__(self, rs = 26, e = 24, bla = 10, 
@@ -116,7 +116,7 @@ class HD44780OPiH616(BaseLCD):
 		for i in range(len(text)):
 			self._sendByte(ord(text[i]),DATA_MODE)
 
-	def backlight(self, state):
+	def setBacklight(self, state):
 		if self._bla is not None:
 			GPIO.output(self._bla, state)
 
@@ -124,7 +124,7 @@ class HD44780OPiH616(BaseLCD):
 		print("Running a demo...")
 		self.init()
 		self.clearScreen()
-		self.backlight(True)
+		self.setBacklight(True)
 		sleep(1)
 		self.printText("HD44780", line = 1, col = 6)
 		self.printText("16x2 LCD demo", line = 2, col = 3)
@@ -142,5 +142,5 @@ class HD44780OPiH616(BaseLCD):
 		self.clearScreen()
 		self.printText("SCREEN", line = 1, col = 6)
 		self.printText("OFF", line = 2, col = 8)
-		self.backlight(False)
+		self.setBacklight(False)
 
