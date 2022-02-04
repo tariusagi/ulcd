@@ -9,7 +9,6 @@ import png
 from baselcd import BaseLCD
 from font6x8 import font6x8
 from font4x6 import font4x6
-from font4x6b import font4x6b
 from font5x6 import font5x6
 
 # Toggle debug mode.
@@ -77,7 +76,7 @@ class ST7920HSPI(BaseLCD):
 		self._textBuf = self._newTextBuf(HCGROM_LINES, HCGROM_COLS)
 		# List of supported fonts.
 		self._gfxFonts = {'default' : font6x8, '6x8' : font6x8,
-				'4x6' : font4x6, '4x6b' : font4x6b, '5x6': font5x6}
+				'4x6' : font4x6, '5x6': font5x6}
 		# Default font for printing text in gfx mode.
 		self._gfxFont = self._gfxFonts['default']
 

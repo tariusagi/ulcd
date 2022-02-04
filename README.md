@@ -34,7 +34,7 @@ Supported LCD types:
 - hd44780: 16x2 character LCD, HD44780 chip, 2 lines 16 characters, 5x8 font.
 - hd44780opi: it is hd44780 written for Orange Pi boards.
 Supported fonts:
-- st7920: 4x6, 6x8 (default).
+- st7920: 4x6, 5x6, 6x8 (default).
 ```
 
 To run this program as a daemon at boot, use `/etc/rc.local` or create a service file `/etc/systemd/system/lcd.service` like this (assumming path to this program is at `/usr/local/bin/lcd`):
@@ -83,7 +83,7 @@ Supported commands are:
 
 ## lcdserver
 
-*This program is obsolete. Use `lcd` in daemon mode instead (see above).*
+*This program is obsolete. I keep it here as an example of how to write a network server in Bash using `ncat`. Use `lcd` in daemon mode instead (see above).*
 
 A Bash script to run a network server and serve requests from clients to control the attached LCD. Requires root priviledge.
 
@@ -175,14 +175,6 @@ The later is what Raspberry Pi boot up with, so this module will just work.
 
 And if you don't want to control the backlight, just connect the BLA pin to a +5V (~60mA), which let the backlight on all the time, or leave both BLA and BLK out to disable the backlight.
 
-## st7920hwspi
-
-A Python 3 program to test the 128x64 ST7920 LCD in hardware SPI mode using spidev module. It just displays some texts in LCD's text mode.
-
-## st7920-demo
-
-A Python 3 program to demonstrate the 128x64 ST7920 LCD in soft clock SPI mode. Running without argument to display a simple test or "all" to perform a full demonstration with texts, custom fonts and graphics.
-
 ## hd44780.py
 
 A Python 3 module to control a 16x2 monochrome LCD screen. Based on this [Interfacing 16x2 LCD with Raspberry Pi](https://www.electronicshub.org/interfacing-16x2-lcd-with-raspberry-pi/). Tested on a Raspberry Pi Zero W.
@@ -256,7 +248,7 @@ OPTION:
   -s, --size=num              Size of font table (number of characters). Default
                               to maximum available from the input file.
   -k, --skip=num              Skip first num of characters.
-        -b, --background=num        Set the value of the background pixels.
+  -b, --background=num        Set the value of the background pixels.
 
 This program will print to stdout a Python source module, with comments telling
 the font's attributes, the font object itself, and a small code to pretty print
