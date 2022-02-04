@@ -6,6 +6,10 @@ class BaseLCD:
 	def __init__(self, driver = "Base"):
 		self._driver = driver
 
+	def debug(self, level):
+		"""Set debug mode level. Level 0 turn it off."""
+		raise NotImplementedError
+
 	def backlight(self, state):
 		"""Set backlight on if state is True, or off if False."""
 		raise NotImplementedError

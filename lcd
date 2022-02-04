@@ -32,6 +32,7 @@ Device options:
 -w usec      Set delay in microsecond between writes to LCD (if supported) or
              "-" to revert to default value (72).
 -p           Print LCD parameters.
+-v n         Verbose/debug level. Debug messages will be sent to stderr.
 Text options:
 -f font      Use given font named "font" (if supported).
 -l line      Set text line before printing (start from 1, default 1).
@@ -70,6 +71,7 @@ def main():
 	port = None
 	freq = None
 	writeDelay = None
+	debug = 0
 
 	# Process command line arguments.
 	if len(sys.argv) == 1:
@@ -77,7 +79,7 @@ def main():
 		sys.exit(0)
 	# Handle commandline arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], 'bBc:d:f:ghil:L:prst:xz:w:')
+		opts, args = getopt.getopt(sys.argv[1:], 'bBc:d:f:ghil:L:prst:xz:w:v:')
 	except getopt.error as err:
 		print(f'ERROR: {str(err)}. Use "-h" for usage.', file = sys.stderr)
 		sys.exit(1)
@@ -118,6 +120,8 @@ def main():
 			freq = v
 		elif o == '-w':
 			writeDelay = v
+		elif o == '-v':
+			debug = int(v)
 		else:
 			print('ERROR: Unknown option. Use "-h" for usage.', file = sys.stderr);
 			sys.exit(2)
@@ -147,6 +151,8 @@ def main():
 		print('ERROR: Unable to initialize an LCD.', file = sys.stderr)
 		sys.exit(4)
 
+	if debug > 0:
+		lcd.debug(debug)
 	if printParams:
 		lcd.printParams()
 	if freq is not None:
@@ -180,6 +186,7 @@ def main():
 		signal.signal(signal.SIGTERM, onExit)
 		print("Activating daemon mode on %s:%s" % (host, port))
 		lcd.clearScreen()
+		lcd.backlight(True)
 		lcd.printText("LCD started")
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -200,23 +207,48 @@ def main():
 						print(f"Command = \"{cmd}\", args = \"{args}\".")
 					except ValueError:
 						cmd = msg
-						print(f"Command = \"{cmd}\".")
+						print(f"Command = \"{cmd}\", no args.")
 					# Handle the extracted command.
 					if cmd == "quit":
 						# Terminate.
-						print("CMD: terminate.")
+						print("Terminate.")
 						quit = True
+					if cmd == "debug":
+						print("Set debug level", debug)
+						lcd.debug(debug)
 					elif cmd == "clear":
-						print("CMD: clear.")
+						print("Clear screen.")
 						lcd.clearScreen()
+					elif cmd == "backlight":
+						if args == "on":
+							print("Turn backlight on.")
+							lcd.backlight(True)
+						elif args == "off":
+							print("Turn backlight off.")
+							lcd.backlight(False)
+					elif cmd == "freq":
+						if args == "-":
+							print("Set frequency to LCD's default.")
+							lcd.setFreq(None)
+						else:
+							print("Set frequency to %sHz" % int(args))
+							lcd.setFreq(int(args))
+					elif cmd == "delay":
+						if args == "-":
+							print("Set write delay to LCD's default.")
+							lcd.setWriteDelay(None)
+						else:
+							print("Set write delay to %s usec" % int(args))
+							lcd.setWriteDelay(int(args))
+						print("Current write delay is %d usec." % lcd._writeDelay)
 					elif cmd == "font":
-						print("CMD: font.")
+						print("Set font to", args)
 						lcd.setGfxFont(args)
 					else:
 						m = re.match('^line([0-9]+)', cmd)
 						if m:
 							line = int(m.groups()[0])
-							print(f"CMD: line {line}, text = \"{args}\"")
+							print(f"Print at line {line} text = \"{args}\".")
 							lcd.printText(args, line = line)
 							continue
 					conn.sendall("OK\n".encode())
@@ -226,6 +258,7 @@ def main():
 			s.close()
 			lcd.clearScreen()
 			lcd.printText("LCD terminated")
+			lcd.backlight(False)
 
 if __name__ == '__main__':
 	main()

@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import os
+import sys
 from time import sleep
 import RPi.GPIO as GPIO
 import spidev
@@ -11,14 +12,12 @@ from font6x8 import font6x8
 from font4x6 import font4x6
 from font5x6 import font5x6
 
-# Toggle debug mode.
-DEBUG = False
 # Serial transmission speed in Hz. Set to 1.95Mhz to be safe, but 39.9Mhz
 # (39900000Hz) tested working well on a Raspberry Pi Zero W.
 # on Raspberry Pi Zero W.
 SPI_SPEED = 1953000
 # Default delay between writes to LCD's internal RAM (in microsecond).
-WRITE_DELAY = 72
+DEFAULT_DELAY = 72
 # Transmission modes: command and data.
 CMD = 0
 DATA = 1
@@ -54,8 +53,9 @@ class ST7920HSPI(BaseLCD):
 	_gfxBuf = []
 
 	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24, freq = SPI_SPEED,
-			writeDelay = WRITE_DELAY):
+			writeDelay = DEFAULT_DELAY):
 		super().__init__(driver = "ST7290")
+		self._debug = 0
 		self._e = e
 		self._rw = rw
 		self._rst = rst
@@ -82,6 +82,14 @@ class ST7920HSPI(BaseLCD):
 		# Default font for printing text in gfx mode.
 		self._gfxFont = self._gfxFonts['default']
 
+	def debug(self, level):
+		"""Set debug level. Level 0 turn it off."""
+		self._debug = level
+		if level > 0:
+			print("Set debug to level", level)
+		else:
+			print("Turn debug off")
+
 	def _sendByte(self, byte, delay = None):
 		"""Send one byte to the LCD. If delay is None, the internal value will be 
 		used."""
@@ -91,7 +99,7 @@ class ST7920HSPI(BaseLCD):
 		self._spi.xfer2([0xF0 & byte, 0xF0 & (byte << 4)], self._spi.max_speed_hz,
 				self._writeDelay if delay is None else delay, 8)
 
-	def _send2Bytes(self, first, second, delay = WRITE_DELAY):
+	def _send2Bytes(self, first, second, delay = None):
 		"""Send 2 bytes. This is for convenience."""
 		self._sendByte(first, delay)
 		self._sendByte(second, delay)
@@ -126,16 +134,13 @@ class ST7920HSPI(BaseLCD):
 	def _sendBlock(self, line, y, start, count):
 		# Move AC.
 		self._setMode(CMD)
-		self._send2Bytes(0x80 + (y % 32), 0x80 + (8 if y >= 32 else 0) + start,
-				delay = 0)
+		self._send2Bytes(0x80 + (y % 32), 0x80 + (8 if y >= 32 else 0) + start)
 		self._setMode(DATA)
 		for i in range(count):
-			self._send2Bytes(line[2 * (start + i)], line[2 * (start + i) + 1],
-					delay = 0)
+			self._send2Bytes(line[2 * (start + i)], line[2 * (start + i) + 1])
 
 	def _sendLine(self, y):
 		"""Send the whole line at y to the LCD."""
-		global DEBUG
 		# Check the whole dirty flag first.
 		if self._gfxBuf[y][16] == 0:
 			# This line is clean? Nothing to do.
@@ -144,7 +149,7 @@ class ST7920HSPI(BaseLCD):
 		buf = self._gfxBuf
 		flag = buf[y][16]
 		# Calculate range of data to send.
-		if DEBUG:
+		if self._debug > 1:
 			debugMsg = ""
 		start = None
 		for i in range(8):
@@ -158,21 +163,21 @@ class ST7920HSPI(BaseLCD):
 					count += 1
 				if i == 7:
 					# Last bit? Send this last block.
-					if DEBUG:
+					if self._debug > 1:
 						debugMsg += "(last)%d:%d " % (start, count)
 					self._sendBlock(buf[y], y, start, count) 
 			elif start is not None:
 				# End of a block? Send it!
-				if DEBUG:
+				if self._debug > 1:
 					debugMsg += "%d:%d " % (start, count)
 				self._sendBlock(buf[y], y, start, count) 
 				# Reset block marker.
 				start = None
-		if DEBUG:
+		if self._debug > 1:
 			print("%02d: %s flag %s blocks %s" % 
 					(y, ' '.join(map(lambda n: format(n, "08b"), buf[y][0:16])),
 						format(flag, "08b"),
-						debugMsg))
+						debugMsg), file = sys.stderr)
 		# Clear dirty bits.
 		buf[y][16] = 0
 	
@@ -195,9 +200,11 @@ class ST7920HSPI(BaseLCD):
 		"""Set delay between byte writes in microseconds. Revert to default if usec 
 		is None"""
 		if usec is None:
-			self._writeDelay = WRITE_DELAY
+			self._writeDelay = DEFAULT_DELAY
 		else:
 			self._writeDelay = usec
+		if self._debug > 0:
+			print("Set write delay to", self._writeDelay, file = sys.stderr)
 
 	def setFreq(self, freq):
 		"""Set SPI frequency. If freq is None, revert back to default."""
