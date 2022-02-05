@@ -30,6 +30,8 @@ Device options:
 -w usec      Set delay in microsecond between writes to LCD (if supported) or
              "-" to revert to default value (72).
 -p           Print LCD parameters.
+-s           Show LCD server showStat at the last line.
+-v n         Verbose/debug level. Debug messages will be sent to stderr.
 Text options:
 -f font      Use given font named "font" (if supported).
 -l line      Set text line before printing (start from 1, default 1).
@@ -84,7 +86,10 @@ Supported commands are:
 - `quit`: terminate the daemon.
 - `clear`: Clear the LCD.
 - `lineN text`: Show the "text" on the LCD's line N.
-- `font name`: Change LCD font to "name" (depends on the LCD type).
+- `backlight on|off`: turn on or off the LCD's backlight.
+- `font name`: Set the LCD font. Use "?" to list the supported fonts.
+- `freq N`: set communication speed to N hertz. Use "-" to set the default value.
+- `delay N`: set delay time between writes to LCD in microseconds. Use "-" to set the default value.
 
 ## lcdserver
 
@@ -141,7 +146,7 @@ To start the server as a service.
 
 ## st7920.py
 
-A Python 3 module to control the 128x64 LCD with ST7290 driver. Bases on [RPi-12864-LCD-ST7920-lib](https://github.com/SrBrahma/RPi-12864-LCD-ST7920-lib).
+A Python 3 module to control the 128x64 LCD with ST7290 driver.
 
 Wiring scheme:
 
