@@ -26,7 +26,7 @@ Device options:
 -g           Use graphic mode (if supported).
 -z freq      Set LCD communication speed in Hz (if supported) or "-" to revert
              to default value (1953000, 1.95Mhz). A 39.9Mhz (39900000Hz)
-						 frequency was tested working well on a Raspberry Pi Zero W.
+             frequency was tested working well on a Raspberry Pi Zero W.
 -w usec      Set delay in microsecond between writes to LCD (if supported) or
              "-" to revert to default value (72).
 -p           Print LCD parameters.
