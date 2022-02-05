@@ -32,7 +32,7 @@ Device options:
 -w usec      Set delay in microsecond between writes to LCD (if supported) or
              "-" to revert to default value (72).
 -p           Print LCD parameters.
--s           Show LCD server status at the last line.
+-s           Show LCD server showStat at the last line.
 -v n         Verbose/debug level. Debug messages will be sent to stderr.
 Text options:
 -f font      Use given font named "font" (if supported).
@@ -73,7 +73,7 @@ def main():
 	freq = None
 	writeDelay = None
 	debug = 0
-	status = False
+	showStat = False
 
 	# Process command line arguments.
 	if len(sys.argv) == 1:
@@ -113,7 +113,7 @@ def main():
 		elif o == '-r':
 			cleanup = True
 		elif o == '-s':
-			status = True
+			showStat = True
 		elif o == '-t':
 			lcdType = v.lower()
 		elif o == '-x':
@@ -189,19 +189,19 @@ def main():
 		print("Activating daemon mode on %s:%s" % (host, port))
 		lcd.clearScreen()
 		lcd.setBacklight(True)
-		if status: lcd.printText(">LCDSRV started", line = lcd.lines)
+		if showStat: lcd.printText(">LCDSRV started", line = lcd.lines)
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 			s.bind((host, port))
 			s.listen()
 			while not quit:
+				if showStat: lcd.printText(f">Listening...", line = lcd.lines)
 				conn, addr = s.accept()
 				if debug > 0: print('Connected by', addr)
-				if status: lcd.printText(f">Conn {addr[0]}", line = lcd.lines)
+				if showStat: lcd.printText(f">{addr[0]} connected", line = lcd.lines)
 				with conn:
 					data = conn.recv(1024)
 					if not data:
-						if status: lcd.printText(f">{addr[0]} no data", line = lcd.lines)
 						break
 					# Extract the command.
 					msg = data.decode('ascii').strip()
@@ -213,6 +213,7 @@ def main():
 						cmd = msg
 						if debug > 0: print(f"Command = \"{cmd}\", no args.")
 					# Handle the extracted command.
+					feedback = "OK.\n"
 					if cmd == "quit":
 						# Terminate.
 						if debug > 0: print("Terminate.")
@@ -245,8 +246,15 @@ def main():
 							if debug > 0: print("Set write delay to %s usec" % int(args))
 							lcd.setWriteDelay(int(args))
 					elif cmd == "font":
-						if debug > 0: print("Set font to", args)
-						lcd.setGfxFont(args)
+						if args == "?":
+							feedback = "Fonts list: %s.\n" % ", ".join(lcd.getGfxFontNames())
+						else:
+							if lcd.setGfxFont(args):
+								if debug > 0: print("Font was set to", args)
+							else:
+								if debug > 0: print("Failed to set font to", args)
+								feedback = "ERROR: invalid font %s. Supported fonts: %s.\n" % (
+										args, ", ".join(lcd.getGfxFontNames()))
 					else:
 						m = re.match('^line([0-9]+)', cmd)
 						if m:
@@ -254,14 +262,12 @@ def main():
 							if debug > 0: print(f"Print at line {line} text = \"{args}\".")
 							lcd.printText(args, line = line)
 							continue
-					conn.sendall("OK\n".encode())
+					conn.sendall(feedback.encode())
 					conn.shutdown(socket.SHUT_RDWR)
-					conn.close()
-					if status: lcd.printText(f">{addr[0]} closed", line = lcd.lines)
 			s.shutdown(socket.SHUT_RDWR)
 			s.close()
 			lcd.clearScreen()
-			if status: lcd.printText(f">LCDSRV stopped", line = lcd.lines)
+			if showStat: lcd.printText(f">LCDSRV stopped", line = lcd.lines)
 			lcd.setBacklight(False)
 
 if __name__ == '__main__':

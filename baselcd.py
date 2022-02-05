@@ -50,10 +50,13 @@ class BaseLCD:
 	def setGfxMode(self):	
 		raise NotImplementedError
 
-	def setGfxFont(self, name):
+	def getGfxFontNames(self):
 		raise NotImplementedError
 
-	def printText(self, text, line = 1, col = 1, fillChar = ' '): 
+	def setGfxFont(self, font):
+		raise NotImplementedError
+
+	def printText(self, text, line = 1, col = 1, fillChar = ' ', wrap = True): 
 		"""Print a text at the given line and column. Missing character will be 
 		filled with fillChar, default is space. If fillChar is None, then the text
 		will be printed as-is"""
