@@ -154,7 +154,7 @@ def main():
 		sys.exit(4)
 
 	if debug > 0:
-		lcd.debug(debug)
+		lcd.setDebug(debug)
 	if printParams:
 		lcd.printParams()
 	if freq is not None:
@@ -201,69 +201,68 @@ def main():
 				if showStat: lcd.printText(f">{addr[0]} connected", line = lcd.lines)
 				with conn:
 					data = conn.recv(1024)
-					if not data:
-						break
-					# Extract the command.
-					msg = data.decode('ascii').strip()
-					if debug > 0: print(f"Received \"{msg}\" from {addr[0]}.")
-					try:
-						cmd, args = msg.split(' ', 1)
-						if debug > 0: print(f"Command = \"{cmd}\", args = \"{args}\".")
-					except ValueError:
-						cmd = msg
-						if debug > 0: print(f"Command = \"{cmd}\", no args.")
-					# Handle the extracted command.
-					feedback = "OK.\n"
-					if cmd == "quit":
-						# Terminate.
-						if debug > 0: print("Terminate.")
-						quit = True
-					if cmd == "debug":
-						if debug > 0: print("Set debug level", debug)
-						lcd.debug(debug)
-					elif cmd == "clear":
-						if debug > 0: print("Clear screen.")
-						lcd.clearScreen()
-					elif cmd == "backlight":
-						if args == "on":
-							if debug > 0: print("Turn backlight on.")
-							lcd.setBacklight(True)
-						elif args == "off":
-							if debug > 0: print("Turn backlight off.")
-							lcd.setBacklight(False)
-					elif cmd == "freq":
-						if args == "-":
-							if debug > 0: print("Set frequency to LCD's default.")
-							lcd.setFreq(None)
-						else:
-							if debug > 0: print("Set frequency to %sHz" % int(args))
-							lcd.setFreq(int(args))
-					elif cmd == "delay":
-						if args == "-":
-							if debug > 0: print("Set write delay to LCD's default.")
-							lcd.setWriteDelay(None)
-						else:
-							if debug > 0: print("Set write delay to %s usec" % int(args))
-							lcd.setWriteDelay(int(args))
-					elif cmd == "font":
-						if args == "?":
-							feedback = "Fonts list: %s.\n" % ", ".join(lcd.getGfxFontNames())
-						else:
-							if lcd.setGfxFont(args):
-								if debug > 0: print("Font was set to", args)
+					if data:
+						# Extract the command.
+						msg = data.decode('ascii').strip()
+						if debug > 0: print(f"Received \"{msg}\" from {addr[0]}.")
+						try:
+							cmd, args = msg.split(' ', 1)
+							if debug > 0: print(f"Command = \"{cmd}\", args = \"{args}\".")
+						except ValueError:
+							cmd = msg
+							if debug > 0: print(f"Command = \"{cmd}\", no args.")
+						# Handle the extracted command.
+						feedback = "OK.\n"
+						if cmd == "quit":
+							# Terminate.
+							if debug > 0: print("Terminate.")
+							quit = True
+						if cmd == "debug":
+							if debug > 0: print("Set debug level", debug)
+							lcd.debug(debug)
+						elif cmd == "clear":
+							if debug > 0: print("Clear screen.")
+							lcd.clearScreen()
+						elif cmd == "backlight":
+							if args == "on":
+								if debug > 0: print("Turn backlight on.")
+								lcd.setBacklight(True)
+							elif args == "off":
+								if debug > 0: print("Turn backlight off.")
+								lcd.setBacklight(False)
+						elif cmd == "freq":
+							if args == "-":
+								if debug > 0: print("Set frequency to LCD's default.")
+								lcd.setFreq(None)
 							else:
-								if debug > 0: print("Failed to set font to", args)
-								feedback = "ERROR: invalid font %s. Supported fonts: %s.\n" % (
-										args, ", ".join(lcd.getGfxFontNames()))
-					else:
-						m = re.match('^line([0-9]+)', cmd)
-						if m:
-							line = int(m.groups()[0])
-							if debug > 0: print(f"Print at line {line} text = \"{args}\".")
-							lcd.printText(args, line = line)
-							continue
-					conn.sendall(feedback.encode())
-					conn.shutdown(socket.SHUT_RDWR)
+								if debug > 0: print("Set frequency to %sHz" % int(args))
+								lcd.setFreq(int(args))
+						elif cmd == "delay":
+							if args == "-":
+								if debug > 0: print("Set write delay to LCD's default.")
+								lcd.setWriteDelay(None)
+							else:
+								if debug > 0: print("Set write delay to %s usec" % int(args))
+								lcd.setWriteDelay(int(args))
+						elif cmd == "font":
+							if args == "?":
+								feedback = "Fonts list: %s.\n" % ", ".join(lcd.getGfxFontNames())
+							else:
+								if lcd.setGfxFont(args):
+									if debug > 0: print("Font was set to", args)
+								else:
+									if debug > 0: print("Failed to set font to", args)
+									feedback = "ERROR: invalid font %s. Supported fonts: %s.\n" % (
+											args, ", ".join(lcd.getGfxFontNames()))
+						else:
+							m = re.match('^line([0-9]+)', cmd)
+							if m:
+								line = int(m.groups()[0])
+								if debug > 0: print(f"Print at line {line} text = \"{args}\".")
+								lcd.printText(args, line = line)
+								continue
+						conn.sendall(feedback.encode())
+						conn.shutdown(socket.SHUT_RDWR)
 			s.shutdown(socket.SHUT_RDWR)
 			s.close()
 			lcd.clearScreen()
