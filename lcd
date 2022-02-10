@@ -7,6 +7,7 @@ from time import sleep
 import socket
 import re
 import signal
+import datetime
 
 VERSION = "0.1"
 PROGRAM = os.path.basename(__file__)
@@ -46,6 +47,7 @@ Supported fonts:
 - st7920: 4x6, 5x6, 6x8 (default).
 """
 
+debug = 0
 quit = False
 
 def onExit(*args):
@@ -53,7 +55,14 @@ def onExit(*args):
 	print("SIGINT or SIGNTERM received.")
 	quit = True
 
+def debugLog(msg):
+	global debug
+	if debug:
+		now = datetime.datetime.now()
+		print(now.strftime('%Y-%m-%d %H:%M:%S'), msg, file = sys.stderr)
+
 def main():
+	global debug
 	global quit
 	# Default settings.
 	lcdType = None
@@ -72,7 +81,6 @@ def main():
 	port = None
 	freq = None
 	writeDelay = None
-	debug = 0
 	showStat = False
 
 	# Process command line arguments.
@@ -197,68 +205,68 @@ def main():
 			while not quit:
 				if showStat: lcd.printText(f">Listening...", line = lcd.lines)
 				conn, addr = s.accept()
-				if debug > 0: print('Connected by', addr)
+				debugLog(f'Connected by {addr}')
 				if showStat: lcd.printText(f">{addr[0]} connected", line = lcd.lines)
 				with conn:
 					data = conn.recv(1024)
 					if data:
 						# Extract the command.
 						msg = data.decode('ascii').strip()
-						if debug > 0: print(f"Received \"{msg}\" from {addr[0]}.")
+						debugLog(f"Received \"{msg}\" from {addr[0]}.")
 						try:
 							cmd, args = msg.split(' ', 1)
-							if debug > 0: print(f"Command = \"{cmd}\", args = \"{args}\".")
+							debugLog(f"Command = \"{cmd}\", args = \"{args}\".")
 						except ValueError:
 							cmd = msg
-							if debug > 0: print(f"Command = \"{cmd}\", no args.")
+							debugLog(f"Command = \"{cmd}\", no args.")
 						# Handle the extracted command.
 						feedback = "OK.\n"
 						if cmd == "quit":
 							# Terminate.
-							if debug > 0: print("Terminate.")
+							debugLog("Terminate.")
 							quit = True
 						if cmd == "debug":
-							if debug > 0: print("Set debug level", debug)
+							debugLog(f"Set debug level {debug}")
 							lcd.debug(debug)
 						elif cmd == "clear":
-							if debug > 0: print("Clear screen.")
+							debugLog("Clear screen.")
 							lcd.clearScreen()
 						elif cmd == "backlight":
 							if args == "on":
-								if debug > 0: print("Turn backlight on.")
+								debugLog("Turn backlight on.")
 								lcd.setBacklight(True)
 							elif args == "off":
-								if debug > 0: print("Turn backlight off.")
+								debugLog("Turn backlight off.")
 								lcd.setBacklight(False)
 						elif cmd == "freq":
 							if args == "-":
-								if debug > 0: print("Set frequency to LCD's default.")
+								debugLog("Set frequency to LCD's default.")
 								lcd.setFreq(None)
 							else:
-								if debug > 0: print("Set frequency to %sHz" % int(args))
+								debugLog("Set frequency to %sHz" % int(args))
 								lcd.setFreq(int(args))
 						elif cmd == "delay":
 							if args == "-":
-								if debug > 0: print("Set write delay to LCD's default.")
+								debugLog("Set write delay to LCD's default.")
 								lcd.setWriteDelay(None)
 							else:
-								if debug > 0: print("Set write delay to %s usec" % int(args))
+								debugLog("Set write delay to %s usec" % int(args))
 								lcd.setWriteDelay(int(args))
 						elif cmd == "font":
 							if args == "?":
 								feedback = "Fonts list: %s.\n" % ", ".join(lcd.getGfxFontNames())
 							else:
 								if lcd.setGfxFont(args):
-									if debug > 0: print("Font was set to", args)
+									debugLog(f"Font was set to {args}")
 								else:
-									if debug > 0: print("Failed to set font to", args)
+									debugLog(f"Failed to set font to {args}")
 									feedback = "ERROR: invalid font %s. Supported fonts: %s.\n" % (
 											args, ", ".join(lcd.getGfxFontNames()))
 						else:
 							m = re.match('^line([0-9]+)', cmd)
 							if m:
 								line = int(m.groups()[0])
-								if debug > 0: print(f"Print at line {line} text = \"{args}\".")
+								debugLog(f"Print at line {line} text = \"{args}\".")
 								lcd.printText(args, line = line)
 								continue
 						conn.sendall(feedback.encode())
