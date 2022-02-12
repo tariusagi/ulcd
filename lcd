@@ -274,19 +274,25 @@ def main():
 				lcdStat(">Listening...")
 				conn, addr = s.accept()
 				debugLog(f'{addr} connected.')
-				if showStat:
-					lcd.printText(f">{addr[0]} connected", line = lcd.lines)
+				lcdStat(f">{addr[0]}:{addr[1]} connected")
 				with conn:
 					while True:
 						data = conn.recv(1024)
 						if not data:
 							break
 						msg = data.decode('ascii').strip()
-						debugLog(f"Received \"{msg}\" from {addr[0]}.")
+						debugLog(f"Received \"{msg}\" from {addr}.")
 						feedback = handleClientMsg(msg)
 						if feedback is not None:
-							conn.sendall(feedback.encode())
-							conn.shutdown(socket.SHUT_RDWR)
+							try:
+								debugLog(f"Sending \"{feedback.strip()}\" back to {addr}")
+								conn.sendall(feedback.encode())
+								# Only handle 1 command a time, so shutdown now.
+								conn.shutdown(socket.SHUT_RDWR)
+							except OSError:
+								# Ignore connection error, since the client might have problem
+								# and close the connection prematurely.
+								pass
 			# Quit?
 			s.shutdown(socket.SHUT_RDWR)
 			s.close()
