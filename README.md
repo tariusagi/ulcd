@@ -6,7 +6,7 @@ Visit https://pinout.xyz/, or run `gpio readall` to view the Raspberry GPIO pino
 
 ## lcd
 
-This Python 3 program controll various LCDs using code from the various modules in this project. 
+This Python 3 program controll various LCDs using code from the various modules in this project. It requires `uvloop` package. Install it with `pip`.
 
 Usage:
 
@@ -14,6 +14,8 @@ Usage:
 Syntax: lcd [OPTION] [TEXT]
 Common options:
 -h           Display this help and exit.
+-a           Use asyncio library instead of select(), which is default.
+-u           Use uvloop library. Do not use with -a option.
 -L host:port Listen on "host:port" for client connections (the daemon mode).
 Device options:
 -t           LCD type (required). See supported types below.

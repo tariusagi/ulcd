@@ -9,6 +9,7 @@ import re
 import signal
 import datetime
 import asyncio
+import uvloop
 
 VERSION = "0.1"
 PROGRAM = os.path.basename(__file__)
@@ -19,6 +20,7 @@ Syntax: {PROGRAM} [OPTION] [TEXT]
 Common options:
 -h           Display this help and exit.
 -a           Use asyncio library instead of select(), which is default.
+-u           Use uvloop library. Do not use with -a option.
 -L host:port Listen on "host:port" for client connections (the daemon mode).
 Device options:
 -t           LCD type (required). See supported types below.
@@ -149,6 +151,7 @@ class LCDServerProtocol(asyncio.Protocol):
 			debugLog(f'Sending "{feedback.strip()}" to {addr}.')
 			self.transport.write(msg.encode())
 		debugLog(f"Close {addr}.")
+		lcdStat(f">{addr[0]}:{addr[1]} closed")
 		self.transport.close()
 
 async def asyncShutdown(signal, loop):
@@ -189,6 +192,7 @@ def main():
 	global showStat
 	# Default settings.
 	useAsyncio = False
+	useUVLoop = False
 	lcdType = None
 	init = False
 	backlight = None
@@ -212,7 +216,7 @@ def main():
 		sys.exit(0)
 	# Handle commandline arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], 'abBc:d:f:ghil:L:prst:xz:w:v:')
+		opts, args = getopt.getopt(sys.argv[1:], 'abBc:d:f:ghil:L:prst:xz:w:uv:')
 	except getopt.error as err:
 		print(f'ERROR: {str(err)}. Use "-h" for usage.', file = sys.stderr)
 		sys.exit(1)
@@ -253,10 +257,12 @@ def main():
 			clear = True
 		elif o == '-z':
 			freq = v
-		elif o == '-w':
-			writeDelay = v
+		elif o == '-u':
+			useUVLoop = True
 		elif o == '-v':
 			debug = int(v)
+		elif o == '-w':
+			writeDelay = v
 		else:
 			print('ERROR: Unknown option. Use "-h" for usage.', file = sys.stderr);
 			sys.exit(2)
@@ -323,6 +329,10 @@ def main():
 		lcdStat(">LCDSRV started.")
 		if useAsyncio:
 			print("Use asyncio.") 
+			asyncio.run(asyncMain(host, port))
+		elif useUVLoop:
+			print("Use uvloop.") 
+			uvloop.install()
 			asyncio.run(asyncMain(host, port))
 		else:
 			# Use select().
