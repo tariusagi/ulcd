@@ -8,6 +8,7 @@ import socket
 import re
 import signal
 import datetime
+import asyncio
 
 VERSION = "0.1"
 PROGRAM = os.path.basename(__file__)
@@ -17,6 +18,7 @@ Display text or graphic to an attached LCD.
 Syntax: {PROGRAM} [OPTION] [TEXT]
 Common options:
 -h           Display this help and exit.
+-a           Use asyncio library instead of select(), which is default.
 -L host:port Listen on "host:port" for client connections (the daemon mode).
 Device options:
 -t           LCD type (required). See supported types below.
@@ -82,6 +84,8 @@ def handleClientMsg(msg):
 	if cmd == "quit":
 		# Terminate.
 		debugLog("Terminate.")
+		# Send SIGNTERM to this process itself.
+		os.kill(os.getpid(), signal.SIGTERM)
 		quit = True
 	if cmd == "debug":
 		debugLog(f"Set debug level {debug}")
@@ -128,12 +132,63 @@ def handleClientMsg(msg):
 			lcd.printText(args, line = line)
 	return feedback
 
+class LCDServerProtocol(asyncio.Protocol):
+	"""The LCD server class to serve LCD requests in asyncio mode."""
+	def connection_made(self, transport):
+		addr = transport.get_extra_info('peername')
+		debugLog(f'{addr} connected.')
+		lcdStat(f">{addr[0]}:{addr[1]} connected")
+		self.transport = transport
+
+	def data_received(self, data):
+		msg = data.decode().strip()
+		addr = self.transport.get_extra_info('peername')
+		debugLog(f'Received "{msg}" from {addr}.')
+		feedback = handleClientMsg(msg)
+		if feedback is not None:
+			debugLog(f'Sending "{feedback.strip()}" to {addr}.')
+			self.transport.write(msg.encode())
+		debugLog(f"Close {addr}.")
+		self.transport.close()
+
+async def asyncShutdown(signal, loop):
+	"""Cleanup tasks tied to the service's shutdown."""
+	debugLog(f"Received exit signal {signal.name}.")
+	# Cancel all running tasks.
+	tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+	[task.cancel() for task in tasks]
+	debugLog(f"Cancelling {len(tasks)} outstanding tasks")
+	await asyncio.gather(*tasks, return_exceptions=True)
+	debugLog("Stop the service loop.")
+	loop.stop()
+
+async def asyncMain(host, port):
+	loop = asyncio.get_running_loop()
+	# Set up signals handlers first.
+	signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
+	for s in signals:
+		loop.add_signal_handler(
+			s, lambda s=s: asyncio.create_task(asyncShutdown(s, loop)))
+	# Now create the server loop and run it.
+	server = await loop.create_server(lambda: LCDServerProtocol(), host, port)
+	async with server:
+		try:
+			await server.serve_forever()
+		except asyncio.CancelledError:
+			pass
+		finally:
+			debugLog("Main service loop closed.")
+			lcd.clearScreen()
+			lcdStat(">LCDSRV stopped.")
+			lcd.setBacklight(False)
+
 def main():
 	global debug
 	global quit
 	global lcd
 	global showStat
 	# Default settings.
+	useAsyncio = False
 	lcdType = None
 	init = False
 	backlight = None
@@ -157,7 +212,7 @@ def main():
 		sys.exit(0)
 	# Handle commandline arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], 'bBc:d:f:ghil:L:prst:xz:w:v:')
+		opts, args = getopt.getopt(sys.argv[1:], 'abBc:d:f:ghil:L:prst:xz:w:v:')
 	except getopt.error as err:
 		print(f'ERROR: {str(err)}. Use "-h" for usage.', file = sys.stderr)
 		sys.exit(1)
@@ -165,6 +220,8 @@ def main():
 		if o == '-h':
 			print(USAGE)
 			sys.exit(0)
+		elif o == '-a':
+			useAsyncio = True
 		elif o == '-g':
 			gfx = True
 		elif o == '-b':
@@ -260,45 +317,51 @@ def main():
  
 	if host is not None:
 		# Daemon mode.
-		signal.signal(signal.SIGINT, onExit)
-		signal.signal(signal.SIGTERM, onExit)
 		print("Activating daemon mode on %s:%s" % (host, port))
 		lcd.clearScreen()
 		lcd.setBacklight(True)
 		lcdStat(">LCDSRV started.")
-		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-			s.bind((host, port))
-			s.listen()
-			while not quit:
-				lcdStat(">Listening...")
-				conn, addr = s.accept()
-				debugLog(f'{addr} connected.')
-				lcdStat(f">{addr[0]}:{addr[1]} connected")
-				with conn:
-					while True:
-						data = conn.recv(1024)
-						if not data:
-							break
-						msg = data.decode('ascii').strip()
-						debugLog(f"Received \"{msg}\" from {addr}.")
-						feedback = handleClientMsg(msg)
-						if feedback is not None:
-							try:
-								debugLog(f"Sending \"{feedback.strip()}\" back to {addr}")
-								conn.sendall(feedback.encode())
-								# Only handle 1 command a time, so shutdown now.
-								conn.shutdown(socket.SHUT_RDWR)
-							except OSError:
-								# Ignore connection error, since the client might have problem
-								# and close the connection prematurely.
-								pass
-			# Quit?
-			s.shutdown(socket.SHUT_RDWR)
-			s.close()
-			lcd.clearScreen()
-			lcdStat(">LCDSRV stopped.")
-			lcd.setBacklight(False)
+		if useAsyncio:
+			print("Use asyncio.") 
+			asyncio.run(asyncMain(host, port))
+		else:
+			# Use select().
+			print("Use select.") 
+			signal.signal(signal.SIGINT, onExit)
+			signal.signal(signal.SIGTERM, onExit)
+			with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+				s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+				s.bind((host, port))
+				s.listen()
+				while not quit:
+					lcdStat(">Listening...")
+					conn, addr = s.accept()
+					debugLog(f'{addr} connected.')
+					lcdStat(f">{addr[0]}:{addr[1]} connected")
+					with conn:
+						while True:
+							data = conn.recv(1024)
+							if not data:
+								break
+							msg = data.decode().strip()
+							debugLog(f'Received "{msg}" from {addr}.')
+							feedback = handleClientMsg(msg)
+							if feedback is not None:
+								try:
+									debugLog(f'Sending "{feedback.strip()}" to {addr}')
+									conn.sendall(feedback.encode())
+									# Only handle 1 command a time, so shutdown now.
+									conn.shutdown(socket.SHUT_RDWR)
+								except OSError:
+									# Ignore connection error, since the client might have problem
+									# and close the connection prematurely.
+									pass
+				# Quit?
+				s.shutdown(socket.SHUT_RDWR)
+				s.close()
+				lcd.clearScreen()
+				lcdStat(">LCDSRV stopped.")
+				lcd.setBacklight(False)
 
 if __name__ == '__main__':
 	main()
