@@ -19,7 +19,7 @@ Display text or graphic to an attached LCD.
 Syntax: {PROGRAM} [OPTION] [TEXT]
 Common options:
 -h           Display this help and exit.
--a           Use asyncio library instead of select(), which is default.
+-a           Use asyncio library instead of simple socket, which is default.
 -u           Use uvloop library. Do not use with -a option.
 -L host:port Listen on "host:port" for client connections (the daemon mode).
 Device options:
@@ -335,8 +335,8 @@ def main():
 			uvloop.install()
 			asyncio.run(asyncMain(host, port))
 		else:
-			# Use select().
-			print("Use select.") 
+			# Use simple socket module.
+			print("Use socket.") 
 			signal.signal(signal.SIGINT, onExit)
 			signal.signal(signal.SIGTERM, onExit)
 			with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

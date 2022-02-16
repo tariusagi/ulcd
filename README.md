@@ -14,7 +14,7 @@ Usage:
 Syntax: lcd [OPTION] [TEXT]
 Common options:
 -h           Display this help and exit.
--a           Use asyncio library instead of select(), which is default.
+-a           Use asyncio library instead of simple socket, which is default.
 -u           Use uvloop library. Do not use with -a option.
 -L host:port Listen on "host:port" for client connections (the daemon mode).
 Device options:
