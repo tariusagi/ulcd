@@ -10,6 +10,7 @@ import signal
 import datetime
 import asyncio
 import uvloop
+import queue
 
 VERSION = "0.1"
 PROGRAM = os.path.basename(__file__)
@@ -55,6 +56,7 @@ debug = 0
 quit = False
 lcd = None
 showStat = False
+q = queue.Queue()
 
 def onExit(*args):
 	global quit
@@ -132,6 +134,7 @@ def handleClientMsg(msg):
 			line = int(m.groups()[0])
 			debugLog(f"Print at line {line} text = \"{args}\".")
 			lcd.printText(args, line = line)
+	debugLog(f"Feedback: {feedback}")
 	return feedback
 
 class LCDServerProtocol(asyncio.Protocol):
@@ -143,16 +146,25 @@ class LCDServerProtocol(asyncio.Protocol):
 		self.transport = transport
 
 	def data_received(self, data):
+		global q
 		msg = data.decode().strip()
 		addr = self.transport.get_extra_info('peername')
 		debugLog(f'Received "{msg}" from {addr}.')
-		feedback = handleClientMsg(msg)
-		if feedback is not None:
-			debugLog(f'Sending "{feedback.strip()}" to {addr}.')
-			self.transport.write(msg.encode())
+		# Put connectio and message into queue.
+		q.put((self.transport, msg))
 		debugLog(f"Close {addr}.")
 		lcdStat(f">{addr[0]}:{addr[1]} closed")
 		self.transport.close()
+
+async def processQueue():
+	global q
+	while True:
+		while not q.empty():
+			debugLog(f"Processing queue...")
+			con, msg = q.get()
+			addr = con.get_extra_info('peername')
+			handleClientMsg(msg)
+		await asyncio.sleep(0.1)
 
 async def asyncShutdown(signal, loop):
 	"""Cleanup tasks tied to the service's shutdown."""
@@ -173,17 +185,17 @@ async def asyncMain(host, port):
 		loop.add_signal_handler(
 			s, lambda s=s: asyncio.create_task(asyncShutdown(s, loop)))
 	# Now create the server loop and run it.
-	server = await loop.create_server(lambda: LCDServerProtocol(), host, port)
-	async with server:
-		try:
-			await server.serve_forever()
-		except asyncio.CancelledError:
-			pass
-		finally:
-			debugLog("Main service loop closed.")
-			lcd.clearScreen()
-			lcdStat(">LCDSRV stopped.")
-			lcd.setBacklight(False)
+	try:
+		await asyncio.gather(processQueue(), 
+				loop.create_server(lambda: LCDServerProtocol(), host, port))
+		#  await server.serve_forever()
+	except asyncio.CancelledError:
+		pass
+	finally:
+		debugLog("Main service loop closed.")
+		lcd.clearScreen()
+		lcdStat(">LCDSRV stopped.")
+		lcd.setBacklight(False)
 
 def main():
 	global debug
