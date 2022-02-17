@@ -22,7 +22,6 @@ Device options:
 -t           LCD type (required). See supported types below.
 -i           Initialize/reset LCD (effectively clear the screen).
 -x           Clear the screen.
--r           Restore/cleanup GPIO settings (default is not) upon termination..
 -B           Turn backlight on.
 -b           Turn backlight off.
 -d opt       Run a demo name "opt" (default "all") and ignore all other options.
@@ -145,7 +144,6 @@ def main():
 	printParams = False
 	line = 1
 	col = 1
-	cleanup = False
 	host = None
 	port = None
 	freq = None
@@ -157,7 +155,7 @@ def main():
 		sys.exit(0)
 	# Handle commandline arguments.
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], 'bBc:d:f:ghil:L:prst:xz:w:v:')
+		opts, args = getopt.getopt(sys.argv[1:], 'bBc:d:f:ghil:L:pst:xz:w:v:')
 	except getopt.error as err:
 		print(f'ERROR: {str(err)}. Use "-h" for usage.', file = sys.stderr)
 		sys.exit(1)
@@ -186,8 +184,6 @@ def main():
 			port = int(port)
 		elif o == '-p':
 			printParams = True
-		elif o == '-r':
-			cleanup = True
 		elif o == '-s':
 			showStat = True
 		elif o == '-t':
@@ -204,6 +200,7 @@ def main():
 			print('ERROR: Unknown option. Use "-h" for usage.', file = sys.stderr);
 			sys.exit(2)
 
+	# Combine all remaining arguments into a text string to be shown on the LCD.
 	text = ' '.join(args)
 
 	if lcdType is None:
@@ -254,9 +251,6 @@ def main():
 		lcd.clearScreen()
 	if len(text):
 		lcd.printText(text, line = line, col = col)
-	if cleanup:
-		# TODO: handle this.
-		pass
  
 	if host is not None:
 		# Daemon mode.
@@ -279,8 +273,9 @@ def main():
 					while True:
 						data = conn.recv(1024)
 						if not data:
+							# No data? The client must have closed the connection.
 							break
-						msg = data.decode('ascii').strip()
+						msg = data.decode().strip()
 						debugLog(f"Received \"{msg}\" from {addr}.")
 						feedback = handleClientMsg(msg)
 						if feedback is not None:

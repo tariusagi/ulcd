@@ -19,7 +19,6 @@ Device options:
 -t           LCD type (required). See supported types below.
 -i           Initialize/reset LCD (effectively clear the screen).
 -x           Clear the screen.
--r           Restore/cleanup GPIO settings (default is not) upon termination..
 -B           Turn backlight on.
 -b           Turn backlight off.
 -d opt       Run a demo name "opt" (default "all") and ignore all other options.
