@@ -24,9 +24,6 @@ DATA = 1
 # Default text mode font settings.
 HCGROM_COLS = 16
 HCGROM_LINES = 4
-# Graphic mode settings.
-WIDTH = 128
-HEIGHT = 64
 
 class ST7920HSPI(BaseLCD):
 	"""Handle LCD with Sitronix ST7290 chip in SPI mode.  The default pins are 
@@ -54,7 +51,7 @@ class ST7920HSPI(BaseLCD):
 
 	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24, freq = SPI_SPEED,
 			writeDelay = DEFAULT_DELAY):
-		super().__init__(driver = "ST7290", width = WIDTH, height = HEIGHT,
+		super().__init__(driver = "ST7290", width = 128, height = 64,
 				columns = HCGROM_COLS, lines = HCGROM_LINES)
 		self._debug = 0
 		self._e = e
@@ -267,13 +264,9 @@ class ST7920HSPI(BaseLCD):
 			return
 		sy = y * 17
 		bi = x // 8
-		# DEBUG
-		return
-		# ENDOFDEBUG
-
+		# TODO: the following codes cause memory leak.
 		# Mark dirty bit.
 		self._fb[sy + 16] |= 0x80 >> (bi // 2)
-
 		# Process pixel bit.
 		if inverted:
 			self._fb[sy + bi] ^= 0x80 >> (x % 8)
@@ -284,14 +277,11 @@ class ST7920HSPI(BaseLCD):
 
 	def erase(self, x, y, redraw = True):
 		"""Erase a dot at x, y (its bit will always be set to zero)."""
-		# DEBUG
-		return
-		# ENDOFDEBUG
-
 		if (x > 127) or (y > 63):
 			return
 		sy = y * 17
 		bi = x // 8
+		# TODO: the following codes cause memory leak.
 		# Mark dirty bit.
 		self._fb[sy + 16] |= 0x80 >> (bi // 2)
 		# Process pixel bit.
