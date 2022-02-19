@@ -8,6 +8,7 @@ import socket
 import re
 import signal
 import datetime
+from threading import Thread
 
 VERSION = "0.1"
 PROGRAM = os.path.basename(__file__)
@@ -39,7 +40,7 @@ Text options:
 -l line      Set text line before printing (start from 1, default 1).
 -c column    Set text column before printing (start from 1, default 1).
 Supported LCD types:
-- st7920: 128x64 graphic LCD, ST7920 chip, 8 lines 21 characters, 6x8 font.
+- st7920: 128x64 graphic LCD, ST7920 chip, 10 lines 32 characters, 4x6 font.
 - hd44780: 16x2 character LCD, HD44780 chip, 2 lines 16 characters, 5x8 font.
 - hd44780opi: it is hd44780 written for Orange Pi boards.
 Supported fonts:
@@ -50,11 +51,22 @@ debug = 0
 quit = False
 lcd = None
 showStat = False
+port = None
 
-def onExit(*args):
-	global quit
-	print("SIGINT or SIGNTERM received.")
-	quit = True
+def sendQuitCmd():
+	"""Send quit command to itself via socket."""
+	global port
+	with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+		s.connect(('localhost', port))
+		s.sendall(b'quit')
+	pass
+
+def onSignal(*args):
+	"""Handle signals to quit."""
+	print("Sending quit to self.")
+	# Create new thread to send quit command to itself.
+	t = Thread(target = sendQuitCmd, args = ())
+	t.start()
 
 def debugLog(msg):
 	global debug
@@ -132,6 +144,7 @@ def main():
 	global quit
 	global lcd
 	global showStat
+	global port
 	# Default settings.
 	lcdType = None
 	init = False
@@ -254,8 +267,9 @@ def main():
  
 	if host is not None:
 		# Daemon mode.
-		signal.signal(signal.SIGINT, onExit)
-		signal.signal(signal.SIGTERM, onExit)
+		# Keep the default SIGINT handler to use later.
+		defaultSIGTERM = signal.signal(signal.SIGTERM, onSignal)
+		signal.signal(signal.SIGINT, onSignal)
 		print("Activating daemon mode on %s:%s" % (host, port))
 		lcd.clearScreen()
 		lcd.setBacklight(True)

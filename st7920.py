@@ -74,7 +74,7 @@ class ST7920HSPI(BaseLCD):
 		self._hcgrom = True
 		self._textBuf = self._newTextBuf(self._lines, self._columns)
 		# List of supported fonts.
-		self._gfxFonts = {'default' : font6x8, '6x8' : font6x8,
+		self._gfxFonts = {'default' : font4x6, '6x8' : font6x8,
 				'4x6' : font4x6, '5x6': font5x6}
 		# Default font for printing text in gfx mode.
 		self._gfxFont = self._gfxFonts['default']
