@@ -93,8 +93,12 @@ class ST7920HSPI(BaseLCD):
 		# A byte is sent as a pair of bytes:
 		# - First byte contains the 4 MSB and 4 "0".
 		# - Second byte contains the 4 LSB and 4 "0".
-		self._spi.xfer2([0xF0 & byte, 0xF0 & (byte << 4)], self._spi.max_speed_hz,
-				self._writeDelay if delay is None else delay, 8)
+		# NOTE: xfer2 currently cause memory leak, so only used if delay is set.
+		if delay is not None:
+			self._spi.xfer2([0xF0 & byte, 0xF0 & (byte << 4)], self._spi.max_speed_hz,
+					self._writeDelay if delay is None else delay, 8)
+		else:
+			self._spi.writebytes([0xF0 & byte, 0xF0 & (byte << 4)])
 
 	def _send2Bytes(self, first, second, delay = None):
 		"""Send 2 bytes. This is for convenience."""
