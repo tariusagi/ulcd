@@ -47,10 +47,10 @@ class ST7920HSPI(BaseLCD):
 	# - If y = 0..31: y address set start at 0x80 + y, x (AC) start at 0x80.
 	# - If y = 32..63: y address start at 0x80 + (y - 32), AC start at 0x88.
 	#
-	# The buffer is set up as a matrix of 64 lines of 17 bytes. The last byte
-	# is the indicator byte, each bit represent a pair of bytes that contain 
+	# The frame buffer is set up as a matrix of 64 lines of 17 bytes. The last 
+	# byte is the indicator byte, each bit represent a pair of bytes that contain 
 	# changes in the line, from MSB (first pair) to LSB (last pair).
-	_gfxBuf = []
+	_fb = bytearray([0] * 1088)
 
 	def __init__(self, e = 11, rw = 10, rst = 25, bla = 24, freq = SPI_SPEED,
 			writeDelay = DEFAULT_DELAY):
@@ -75,7 +75,6 @@ class ST7920HSPI(BaseLCD):
 		# Default to text mode with 8x16 HCGROM font, 4 lines, 16 letters width.
 		self._textMode = True
 		self._hcgrom = True
-		self._gfxBuf = [[0] * 17 for i in range(64)]
 		self._textBuf = self._newTextBuf(self._lines, self._columns)
 		# List of supported fonts.
 		self._gfxFonts = {'default' : font6x8, '6x8' : font6x8,
@@ -143,12 +142,13 @@ class ST7920HSPI(BaseLCD):
 	def _sendLine(self, y):
 		"""Send the whole line at y to the LCD."""
 		# Check the whole dirty flag first.
-		if self._gfxBuf[y][16] == 0:
+		sy = y * 17
+		if self._fb[sy + 16] == 0:
 			# This line is clean? Nothing to do.
 			return
 		# Create a short alias (reference).
-		buf = self._gfxBuf
-		flag = buf[y][16]
+		b = self._fb
+		flag = b[sy + 16]
 		# Calculate range of data to send.
 		if self._debug > 1:
 			debugMsg = ""
@@ -166,21 +166,21 @@ class ST7920HSPI(BaseLCD):
 					# Last bit? Send this last block.
 					if self._debug > 1:
 						debugMsg += "(last)%d:%d " % (start, count)
-					self._sendBlock(buf[y], y, start, count) 
+					self._sendBlock(b[sy : sy + 16], y, start, count) 
 			elif start is not None:
 				# End of a block? Send it!
 				if self._debug > 1:
 					debugMsg += "%d:%d " % (start, count)
-				self._sendBlock(buf[y], y, start, count) 
+				self._sendBlock(b[sy : sy + 16], y, start, count) 
 				# Reset block marker.
 				start = None
 		if self._debug > 1:
 			print("%02d: %s flag %s blocks %s" % 
-					(y, ' '.join(map(lambda n: format(n, "08b"), buf[y][0:16])),
+					(y, ' '.join(map(lambda n: format(n, "08b"), b[sy : sy + 16])),
 						format(flag, "08b"),
 						debugMsg), file = sys.stderr)
 		# Clear dirty bits.
-		buf[y][16] = 0
+		b[sy + 16] = 0
 	
 	def _fillTextLine(self, text, col, maxCols, fillChar):
 		# Trim text longer than display.
@@ -253,10 +253,11 @@ class ST7920HSPI(BaseLCD):
 			self._textBuf = self._newTextBuf(self._lines, self._columns)
 		else:
 			# Reset internal graphic buffer.
-			self._gfxBuf = [[pattern] * 17 for i in range(64)]
+			for i in range(1088):
+				self._fb[i] = pattern
 			# Mark all lines dirty.
 			for y in range(64):
-				self._gfxBuf[y][16] = 0xFF
+				self._fb[y * 17 + 16] = 0xFF
 		if redraw:
 			self.redraw()
 
@@ -264,26 +265,37 @@ class ST7920HSPI(BaseLCD):
 		"""Plot a dot at x, y. If inverted = True, then the dot will be inverted."""
 		if (x > 127) or (y > 63):
 			return
-		byteIndex = x // 8
+		sy = y * 17
+		bi = x // 8
+		# DEBUG
+		return
+		# ENDOFDEBUG
+
 		# Mark dirty bit.
-		self._gfxBuf[y][16] |= 0x80 >> (byteIndex // 2)
+		self._fb[sy + 16] |= 0x80 >> (bi // 2)
+
 		# Process pixel bit.
 		if inverted:
-			self._gfxBuf[y][byteIndex] ^= 0x80 >> (x % 8)
+			self._fb[sy + bi] ^= 0x80 >> (x % 8)
 		else:
-			self._gfxBuf[y][byteIndex] |= 0x80 >> (x % 8)
+			self._fb[sy + bi] |= 0x80 >> (x % 8)
 		if redraw:
 			self.redraw()
 
 	def erase(self, x, y, redraw = True):
 		"""Erase a dot at x, y (its bit will always be set to zero)."""
+		# DEBUG
+		return
+		# ENDOFDEBUG
+
 		if (x > 127) or (y > 63):
 			return
-		byteIndex = x // 8
+		sy = y * 17
+		bi = x // 8
 		# Mark dirty bit.
-		self._gfxBuf[y][16] |= 0x80 >> (byteIndex // 2)
+		self._fb[sy + 16] |= 0x80 >> (bi // 2)
 		# Process pixel bit.
-		self._gfxBuf[y][byteIndex] &= ~(0x80 >> (x % 8))
+		self._fb[sy + bi] &= ~(0x80 >> (x % 8))
 		if redraw:
 			self.redraw()
 
@@ -442,8 +454,8 @@ class ST7920HSPI(BaseLCD):
 
 	def _newTextBuf(self, lines, width):
 		"""Return a space filled text buffer with given number of lines and width."""
-		buf = [[' '] * width for i in range(lines)]
-		return buf
+		b = [[' '] * width for i in range(lines)]
+		return b
 
 	def printText(self, text, line = 1, col = 1, fillChar = ' ', wrap = True): 
 		"""Print a text at the given line and column. Missing character will be 
