@@ -79,64 +79,74 @@ def lcdStat(msg):
 		lcd.printText(msg, line = lcd.lines)
 
 def handleClientMsg(msg):
-	"""Handle client's message and return a feedback."""
+	"""Handle client's message and return a feedback. A message can contains
+	multiple commands, separated by double semi-colons ';;'."""
 	global quit
 	global lcd
-	try:
-		cmd, args = msg.split(' ', 1)
-		debugLog(f"Command = \"{cmd}\", args = \"{args}\".")
-	except ValueError:
-		cmd = msg
-		debugLog(f"Command = \"{cmd}\", no args.")
-	# Handle the extracted command.
-	feedback = "OK.\n"
-	if cmd == "quit":
-		# Terminate.
-		debugLog("Terminate.")
-		quit = True
-	if cmd == "debug":
-		debugLog(f"Set debug level {debug}")
-		lcd.debug(debug)
-	elif cmd == "clear":
-		debugLog("Clear screen.")
-		lcd.clearScreen()
-	elif cmd == "backlight":
-		if args == "on":
-			debugLog("Turn backlight on.")
-			lcd.setBacklight(True)
-		elif args == "off":
-			debugLog("Turn backlight off.")
-			lcd.setBacklight(False)
-	elif cmd == "freq":
-		if args == "-":
-			debugLog("Set frequency to LCD's default.")
-			lcd.setFreq(None)
-		else:
-			debugLog("Set frequency to %sHz" % int(args))
-			lcd.setFreq(int(args))
-	elif cmd == "delay":
-		if args == "-":
-			debugLog("Set write delay to LCD's default.")
-			lcd.setWriteDelay(None)
-		else:
-			debugLog("Set write delay to %s usec" % int(args))
-			lcd.setWriteDelay(int(args))
-	elif cmd == "font":
-		if args == "?":
-			feedback = "Fonts list: %s.\n" % ", ".join(lcd.getGfxFontNames())
-		else:
-			if lcd.setGfxFont(args):
-				debugLog(f"Font was set to {args}")
+	# Default feedback. It will be updated to the last command.
+	feedback = "OK."
+	cmds = msg.split(';;')
+	for cmd in cmds:
+		cmd = cmd.strip()
+		if not len(cmd):
+			continue
+		debugLog(f"Command = \"{cmd}\".")
+		try:
+			op, args = cmd.split(' ', 1)
+			debugLog(f"Op = \"{op}\", args = \"{args}\".")
+		except ValueError:
+			op = cmd
+			debugLog(f"Op = \"{op}\", no args.")
+		# Handle the extracted command.
+		if op == "quit":
+			# Terminate.
+			debugLog("Terminate.")
+			quit = True
+			break
+		if op == "debug":
+			debugLog(f"Set debug level {debug}")
+			lcd.debug(debug)
+		elif op == "clear":
+			debugLog("Clear screen.")
+			lcd.clearScreen()
+		elif op == "backlight":
+			if args == "on":
+				debugLog("Turn backlight on.")
+				lcd.setBacklight(True)
+			elif args == "off":
+				debugLog("Turn backlight off.")
+				lcd.setBacklight(False)
+		elif op == "freq":
+			if args == "-":
+				debugLog("Set frequency to LCD's default.")
+				lcd.setFreq(None)
 			else:
-				debugLog(f"Failed to set font to {args}")
-				feedback = "ERROR: invalid font %s. Supported fonts: %s.\n" % (
-						args, ", ".join(lcd.getGfxFontNames()))
-	else:
-		m = re.match('^line([0-9]+)', cmd)
-		if m:
-			line = int(m.groups()[0])
-			debugLog(f"Print at line {line} text = \"{args}\".")
-			lcd.printText(args, line = line)
+				debugLog("Set frequency to %sHz" % int(args))
+				lcd.setFreq(int(args))
+		elif op == "delay":
+			if args == "-":
+				debugLog("Set write delay to LCD's default.")
+				lcd.setWriteDelay(None)
+			else:
+				debugLog("Set write delay to %s usec" % int(args))
+				lcd.setWriteDelay(int(args))
+		elif op == "font":
+			if args == "?":
+				feedback = "Fonts list: %s.\n" % ", ".join(lcd.getGfxFontNames())
+			else:
+				if lcd.setGfxFont(args):
+					debugLog(f"Font was set to {args}")
+				else:
+					debugLog(f"Failed to set font to {args}")
+					feedback = "ERROR: invalid font %s. Supported fonts: %s.\n" % (
+							args, ", ".join(lcd.getGfxFontNames()))
+					break;
+		else:
+			m = re.match('^line([0-9]+)', op)
+			if m:
+				line = int(m.groups()[0])
+				debugLog(f"Print at line {line} text = \"{args}\".")
+				lcd.printText(args, line = line)
 	return feedback
 
 def main():

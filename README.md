@@ -80,6 +80,14 @@ echo clear | nc -w1 127.0.0.1 1234
 echo line2 Hello World | nc -w1 127.0.0.1 1234
 ```
 
+Multiple commands can be sent together, separated by double semi-colons ";;". For example:
+
+```sh
+echo font 6x8;; clear;; line2 Hello World | nc -w1 127.0.0.1 1234
+```
+
+Will tell lcd to set font to 6x8, clear the screen, then print "Hello World" at line 2.
+
 Supported commands are:
 
 - `quit`: terminate the daemon.

@@ -78,6 +78,8 @@ class ST7920HSPI(BaseLCD):
 				'4x6' : font4x6, '5x6': font5x6}
 		# Default font for printing text in gfx mode.
 		self._gfxFont = self._gfxFonts['default']
+		# Update metrics.
+		self._updateMetrics()
 
 	def setDebug(self, level):
 		"""Set setDebug level. Level 0 turn it off."""
@@ -227,8 +229,7 @@ class ST7920HSPI(BaseLCD):
 	def setTextMode(self):	
 		if not self._textMode:
 			self._textMode = True
-			self._columns = HCGROM_COLS
-			self._lines = HCGROM_LINES
+			self._updateMetrics()
 			self._setMode(CMD)
 			self._sendByte(0x34) # Extend instruction set
 			self._sendByte(0x34) # Graphic OFF
@@ -240,8 +241,7 @@ class ST7920HSPI(BaseLCD):
 	def setGfxMode(self):	
 		if self._textMode:
 			self._textMode = False
-			self._columns = self._width // self._gfxFont['width']
-			self._lines = self._height // self._gfxFont['height']
+			self._updateMetrics()
 			self._setMode(CMD)
 			self._sendByte(0x34) # Extend instruction set
 			self._sendByte(0x36) # Turn on graphic display.
@@ -361,8 +361,8 @@ class ST7920HSPI(BaseLCD):
 		if (len(text) + col - 1 > self._columns):
 			text = text[0:self._columns - col + 1]
 		# Draw characters on gfx buffer.
-		x = (col - 1) * font['width']
-		y = (line - 1) * font['height']
+		x = (col - 1) * font['width'] + self._marginLeft
+		y = (line - 1) * font['height'] + self._marginTop
 		for c in text:
 			try:
 				rows = font['bitmap'][ord(c)]
@@ -451,6 +451,23 @@ class ST7920HSPI(BaseLCD):
 		b = [[' '] * width for i in range(lines)]
 		return b
 
+	def _updateMetrics(self):
+		"""Recaculate and set metrics in gfx mode."""
+		if self._textMode:
+			self._columns = HCGROM_COLS
+			self._lines = HCGROM_LINES
+		else:
+			# Margins for gfx text.
+			self._marginLeft = 128 % self._gfxFont['width'] // 2
+			self._marginRight = self._marginLeft
+			self._marginTop = 64 % self._gfxFont['height'] // 2
+			self._marginBottom = self._marginTop
+			# Maximum lines and columns.
+			self._columns = (self._width - self._marginLeft - self._marginRight) \
+				// self._gfxFont['width']
+			self._lines = (self._height - self._marginTop - self._marginBottom) \
+				// self._gfxFont['height']
+
 	def printText(self, text, line = 1, col = 1, fillChar = ' ', wrap = True): 
 		"""Print a text at the given line and column. Missing character will be 
 		filled with fillChar, default is space. If fillChar is None, then the text
@@ -474,8 +491,7 @@ class ST7920HSPI(BaseLCD):
 					self._gfxFont = self._gfxFonts[s]
 					ok = True
 		if ok:
-			self._columns = self._width // self._gfxFont['width']
-			self._lines = self._height // self._gfxFont['height']
+			self._updateMetrics()
 			return True
 		else:
 			return False
