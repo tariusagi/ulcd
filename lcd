@@ -337,8 +337,17 @@ def main():
 			# Quit?
 			s.shutdown(socket.SHUT_RDWR)
 			s.close()
+			# Leave a stop message on screen.
 			lcd.clearScreen()
-			lcdStat("LCDSRV stopped.")
+			t = datetime.datetime.now().strftime('%Y%m%d %H:%M')
+			s = "LCDSRV stopped."
+			l = lcd.lines // 2
+			if lcd.columns <= len(s):
+				c = 1
+			else:
+				c = (lcd.columns - len(s)) // 2
+			lcd.printText(t, line = l - 1, col = c)
+			lcd.printText(s, line = l, col = c)
 			lcd.setBacklight(False)
 
 if __name__ == '__main__':
