@@ -53,20 +53,29 @@ lcd = None
 showStat = False
 port = None
 
-def sendQuitCmd():
+def clock():
 	"""Send quit command to itself via socket."""
+	global port
+	while True:
+		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+			try:
+				s.connect(('localhost', port))
+				t = datetime.datetime.now().strftime('%H:%M:%S>')
+				msg = f'text {lcd.lines} 1 nofill {t}'
+				s.sendall(msg.encode())
+				sleep(1)
+			except:
+				break
+
+def sendQuit():
 	global port
 	with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 		s.connect(('localhost', port))
-		s.sendall(b'quit')
-	pass
+		s.sendall('quit'.encode())
 
 def onSignal(*args):
 	"""Handle signals to quit."""
-	print("Sending quit to self.")
-	# Create new thread to send quit command to itself.
-	t = Thread(target = sendQuitCmd, args = ())
-	t.start()
+	Thread(target = sendQuit, args = ()).start()
 
 def debugLog(msg):
 	global debug
@@ -76,7 +85,8 @@ def debugLog(msg):
 
 def lcdStat(msg):
 	if showStat:
-		lcd.printText(msg, line = lcd.lines)
+		msg = msg.ljust(lcd.columns - 9)
+		lcd.printText(msg, line = lcd.lines, col = 10, fillChar = None)
 
 def handleClientMsg(msg):
 	"""Handle client's message and return a feedback. A message can contains
@@ -140,7 +150,16 @@ def handleClientMsg(msg):
 					debugLog(f"Failed to set font to {args}")
 					feedback = "ERROR: invalid font %s. Supported fonts: %s.\n" % (
 							args, ", ".join(lcd.getGfxFontNames()))
-					break;
+		elif op == "text":
+			# Syntax: text line column fill|nofill content
+			l = args.split(' ')
+			if len(l) < 4:
+				debugLog("Invalid syntax")
+				feedback = "ERROR: invalid syntax."
+			else:
+				s = ' '.join(l[3:])
+				debugLog(f'Printing "{s}" at line {l[0]}, column {l[1]}, {l[2]}.')
+				lcd.printText(s, line = int(l[0]), col = int(l[1]), fillChar =  None if l[2] == "nofill" else ' ')
 		else:
 			m = re.match('^line([0-9]+)', op)
 			if m:
@@ -283,16 +302,19 @@ def main():
 		print("Activating daemon mode on %s:%s" % (host, port))
 		lcd.clearScreen()
 		lcd.setBacklight(True)
-		lcdStat(">LCDSRV started.")
+		lcdStat("LCDSRV started.")
+		if showStat:
+			# Create new thread to send heart beats.
+			Thread(target = clock, args = ()).start()
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 			s.bind((host, port))
 			s.listen()
 			while not quit:
-				lcdStat(">Listening...")
+				lcdStat("Listening...")
 				conn, addr = s.accept()
 				debugLog(f'{addr} connected.')
-				lcdStat(f">{addr[0]}:{addr[1]} connected")
+				lcdStat(f"{addr[0]}:{addr[1]} connected")
 				with conn:
 					while True:
 						data = conn.recv(1024)
@@ -316,7 +338,7 @@ def main():
 			s.shutdown(socket.SHUT_RDWR)
 			s.close()
 			lcd.clearScreen()
-			lcdStat(">LCDSRV stopped.")
+			lcdStat("LCDSRV stopped.")
 			lcd.setBacklight(False)
 
 if __name__ == '__main__':

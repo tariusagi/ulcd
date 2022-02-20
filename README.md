@@ -92,7 +92,8 @@ Supported commands are:
 
 - `quit`: terminate the daemon.
 - `clear`: Clear the LCD.
-- `lineN text`: Show the "text" on the LCD's line N.
+- `lineN msg`: Show "msg" at the beginning of line N.
+- `text line col fill|nofill msg`: Show "msg" at the given line and column. If "fill", unused columns in the line willbe filled with spaces.
 - `backlight on|off`: turn on or off the LCD's backlight.
 - `font name`: Set the LCD font. Use "?" to list the supported fonts.
 - `freq N`: set communication speed to N hertz. Use "-" to set the default value.
