@@ -24,6 +24,8 @@ DATA = 1
 # Default text mode font settings.
 HCGROM_COLS = 16
 HCGROM_LINES = 4
+HCGROM_WIDTH = 8
+HCGROM_HEIGHT = 16
 
 class ST7920HSPI(BaseLCD):
 	"""Handle LCD with Sitronix ST7290 chip in SPI mode.  The default pins are 
@@ -192,6 +194,34 @@ class ST7920HSPI(BaseLCD):
 		if len(text) < maxCols:
 			text = text.ljust(maxCols, fillChar)
 		return text
+
+	@BaseLCD.fontWidth.getter
+	def fontWidth(self):
+		return HCGROM_WIDTH if self._textMode else self._gfxFont['width']
+
+	@BaseLCD.fontHeight.getter
+	def fontHeight(self):
+		return HCGROM_HEIGHT if self._textMode else self._gfxFont['height']
+
+	@BaseLCD.marginTop.getter
+	def marginTop(self):
+		return 0 if self._textMode else self._marginTop
+
+	@BaseLCD.marginLeft.getter
+	def marginLeft(self):
+		return 0 if self._textMode else self._marginLeft
+
+	@BaseLCD.marginBottom.getter
+	def marginBottom(self):
+		return 0 if self._textMode else self._marginBottom
+
+	@BaseLCD.marginRight.getter
+	def marginRight(self):
+		return 0 if self._textMode else self._marginRight
+
+	@BaseLCD.textMode.getter
+	def textMode(self):
+		return self._textMode
 
 	def setBacklight(self, state):
 		if self._bla is not None:

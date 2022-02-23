@@ -87,6 +87,16 @@ def lcdStat(msg):
 	if showStat:
 		msg = msg.ljust(lcd.columns - 9)
 		lcd.printText(msg, line = lcd.lines, col = 10, fillChar = None)
+		# Draw a bar above the status text if possible.
+		try:
+			if not lcd.textMode:	 
+				y = (lcd.lines - 1)*lcd.fontHeight + lcd.marginTop - 2
+				for x in range(lcd.marginLeft, lcd.width - lcd.marginRight):
+					lcd.plot(x, y, redraw = False)
+					lcd.plot(x, y + lcd.fontHeight + 2, redraw = False)
+				lcd.redraw()
+		except NotImplementedError:
+			pass
 
 def handleClientMsg(msg):
 	"""Handle client's message and return a feedback. A message can contains
@@ -339,15 +349,15 @@ def main():
 			s.close()
 			# Leave a stop message on screen.
 			lcd.clearScreen()
-			t = datetime.datetime.now().strftime('%Y%m%d %H:%M')
-			s = "LCDSRV stopped."
+			t = datetime.datetime.now().strftime('(%Y%m%d %H:%M)')
+			s = "lcdsrv stopped"
 			l = lcd.lines // 2
 			if lcd.columns <= len(s):
 				c = 1
 			else:
-				c = (lcd.columns - len(s)) // 2
-			lcd.printText(t, line = l - 1, col = c)
+				c = (lcd.columns - len(s)) // 2 + 1
 			lcd.printText(s, line = l, col = c)
+			lcd.printText(t, line = l + 1, col = c - 1)
 			lcd.setBacklight(False)
 
 if __name__ == '__main__':

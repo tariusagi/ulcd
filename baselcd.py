@@ -26,6 +26,37 @@ class BaseLCD:
 	def lines(self):
 		return self._lines
 
+	@property
+	def fontWidth(self):
+		"""Returns width of a character in the current font."""
+		raise NotImplementedError
+
+	@property
+	def fontHeight(self):
+		"""Returns height of a character in the current font."""
+		raise NotImplementedError
+
+	@property
+	def marginTop(self):
+		raise NotImplementedError
+
+	@property
+	def marginLeft(self):
+		raise NotImplementedError
+
+	@property
+	def marginBottom(self):
+		raise NotImplementedError
+
+	@property
+	def marginRight(self):
+		raise NotImplementedError
+
+	@property
+	def textMode(self):
+		"""Returns True if in text mode."""
+		raise NotImplementedError
+
 	def setDebug(self, level):
 		"""Set setDebug mode level. Level 0 turn it off."""
 		raise NotImplementedError
