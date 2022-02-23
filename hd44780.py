@@ -32,7 +32,8 @@ class HD44780(BaseLCD):
 
 	def __init__(self, rs = 17, e = 27, bla = 16, d4 = 22, d5 = 5, d6 = 6,
 			d7 = 26, lines = 2, cols = 16):
-		super().__init__(driver = "HD44780")
+		super().__init__(driver = "HD44780", width = 128, height = 32, columns = 16,
+				lines = 2)
 		self._rs = rs
 		self._e = e
 		self._bla = bla

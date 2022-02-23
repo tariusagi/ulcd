@@ -55,7 +55,6 @@ class ST7920HSPI(BaseLCD):
 			writeDelay = DEFAULT_DELAY):
 		super().__init__(driver = "ST7290", width = 128, height = 64,
 				columns = HCGROM_COLS, lines = HCGROM_LINES)
-		self._debug = 0
 		self._e = e
 		self._rw = rw
 		self._rst = rst
@@ -82,14 +81,6 @@ class ST7920HSPI(BaseLCD):
 		self._gfxFont = self._gfxFonts['default']
 		# Update metrics.
 		self._updateMetrics()
-
-	def setDebug(self, level):
-		"""Set setDebug level. Level 0 turn it off."""
-		self._debug = level
-		if level > 0:
-			print("Set setDebug to level", level)
-		else:
-			print("Turn setDebug off")
 
 	def _sendByte(self, byte, delay = None):
 		"""Send one byte to the LCD. If delay is None, the internal value will be 
