@@ -47,27 +47,48 @@ Supported fonts:
 - st7920: 4x6, 5x6, 6x8 (default).
 """
 
+# Default settings.
 debug = 0
 quit = False
 lcd = None
+backlight = None
 showStat = False
 port = None
+blink = False
 
-def clock():
-	"""Send quit command to itself via socket."""
+def heartbeat():
+	"""Send nop or update clock every 1 second."""
 	global port
-	while True:
+	global showStat
+	global quit
+	while not quit:
+		if showStat:
+			t = datetime.datetime.now().strftime('%H:%M:%S>')
+			cmd = f'text {lcd.lines} 1 nofill {t}'
+		else:
+			cmd = "nop"
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 			try:
 				s.connect(('localhost', port))
-				t = datetime.datetime.now().strftime('%H:%M:%S>')
-				msg = f'text {lcd.lines} 1 nofill {t}'
-				s.sendall(msg.encode())
-				sleep(1)
+				s.sendall(cmd.encode())
 			except:
-				break
+				pass
+		sleep(1)
+
+def blinkScreen(interval = 0.5):
+	"""Run every 0.1s to do things like update clock at the status line."""
+	global lcd
+	global blink
+	global quit
+	state = False
+	while blink and (not quit):
+		lcd.setBacklight(state)
+		# Flip the state.
+		state = not state
+		sleep(interval)
 
 def sendQuit():
+	"""Send quit command to itself via socket."""
 	global port
 	with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 		s.connect(('localhost', port))
@@ -103,6 +124,8 @@ def handleClientMsg(msg):
 	multiple commands, separated by double semi-colons ';;'."""
 	global quit
 	global lcd
+	global backlight
+	global blink
 	# Default feedback. It will be updated to the last command.
 	feedback = "OK."
 	cmds = msg.split(';;')
@@ -116,8 +139,12 @@ def handleClientMsg(msg):
 			debugLog(f"Op = \"{op}\", args = \"{args}\".")
 		except ValueError:
 			op = cmd
+			args = None
 			debugLog(f"Op = \"{op}\", no args.")
 		# Handle the extracted command.
+		if op == "nop":
+			# No operation command. Simply do nothing.
+			pass
 		if op == "quit":
 			# Terminate.
 			debugLog("Terminate.")
@@ -132,10 +159,29 @@ def handleClientMsg(msg):
 		elif op == "backlight":
 			if args == "on":
 				debugLog("Turn backlight on.")
-				lcd.setBacklight(True)
+				backlight = True
 			elif args == "off":
 				debugLog("Turn backlight off.")
-				lcd.setBacklight(False)
+				backlight = False
+			lcd.setBacklight(backlight)
+		elif op == "blink":
+			if args == "off":
+				debugLog("Turn blinking off.")
+				blink = False
+				# Restore backlight state.
+				lcd.setBacklight(backlight)
+			elif not blink:
+				try:
+					interval = float(args)
+					blink = True
+					# Create a thread to do the blinking.
+					Thread(target = blinkScreen, args = (interval,)).start()
+				except ValueError:
+					debugLog("Invalid blink interval.")
+					feedback = "Invalid blink interval."
+			else:
+				debugLog("Already blinking. Command ignored.")
+				feedback = "Already blinking. Stop blinking first."
 		elif op == "freq":
 			if args == "-":
 				debugLog("Set frequency to LCD's default.")
@@ -182,12 +228,13 @@ def main():
 	global debug
 	global quit
 	global lcd
+	global backlight
 	global showStat
 	global port
+	global blink
 	# Default settings.
 	lcdType = None
 	init = False
-	backlight = None
 	gfx = None
 	clear = False
 	demo = None
@@ -311,11 +358,11 @@ def main():
 		signal.signal(signal.SIGINT, onSignal)
 		print("Activating daemon mode on %s:%s" % (host, port))
 		lcd.clearScreen()
-		lcd.setBacklight(True)
+		backlight = True
+		lcd.setBacklight(backlight)
 		lcdStat("LCDSRV started.")
-		if showStat:
-			# Create new thread to send heart beats.
-			Thread(target = clock, args = ()).start()
+		# Create new thread to keep heatbeats.
+		Thread(target = heartbeat, args = ()).start()
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 			s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 			s.bind((host, port))

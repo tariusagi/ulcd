@@ -95,6 +95,7 @@ Supported commands are:
 - `lineN msg`: Show "msg" at the beginning of line N.
 - `text line col fill|nofill msg`: Show "msg" at the given line and column. If "fill", unused columns in the line willbe filled with spaces.
 - `backlight on|off`: turn on or off the LCD's backlight.
+- `blink N|off`: blink the LCD every N second or turn it off. N can be a float like 0.1, 0.2, etc.
 - `font name`: Set the LCD font. Use "?" to list the supported fonts.
 - `freq N`: set communication speed to N hertz. Use "-" to set the default value.
 - `delay N`: set delay time between writes to LCD in microseconds. Use "-" to set the default value.
