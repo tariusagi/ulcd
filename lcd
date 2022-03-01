@@ -8,7 +8,7 @@ import socket
 import re
 import signal
 import datetime
-from threading import Thread
+from threading import Thread, Lock
 
 VERSION = "0.1"
 PROGRAM = os.path.basename(__file__)
@@ -57,6 +57,9 @@ showStat = False
 port = None
 blink = False
 
+# The mutex to use lcd.
+mutex = Lock()
+
 def heartbeat():
 	"""Send nop or update clock every 1 second."""
 	global port
@@ -81,9 +84,12 @@ def blinkScreen(interval = 0.5):
 	global lcd
 	global blink
 	global quit
+	global mutex
 	state = False
 	while blink and (not quit):
+		mutex.acquire()
 		lcd.setBacklight(state)
+		mutex.release()
 		# Flip the state.
 		state = not state
 		sleep(interval)
@@ -106,7 +112,9 @@ def debugLog(msg):
 		print(now.strftime('%Y-%m-%d %H:%M:%S'), msg, file = sys.stderr)
 
 def lcdStat(msg):
+	global mutex
 	if showStat:
+		mutex.acquire()
 		msg = msg.ljust(lcd.columns - 9)
 		lcd.printText(msg, line = lcd.lines, col = 10, fillChar = None)
 		# Draw a bar above the status text if possible.
@@ -119,6 +127,7 @@ def lcdStat(msg):
 				lcd.redraw()
 		except NotImplementedError:
 			pass
+		mutex.release()
 
 def handleMsg(msg):
 	"""Handle client's message and return a feedback. A message can contains
@@ -129,7 +138,9 @@ def handleMsg(msg):
 	global lcd
 	global backlight
 	global blink
+	global mutex
 	# Default feedback. It will be updated to the last command.
+	mutex.acquire()
 	feedback = "OK."
 	cmds = msg.split(';;')
 	for cmd in cmds:
@@ -242,6 +253,7 @@ def handleMsg(msg):
 				line = int(m.groups()[0])
 				debugLog(f"Print at line {line} text = \"{args}\".")
 				lcd.printText(args, line = line)
+	mutex.release()
 	return feedback
 
 def main():
@@ -415,6 +427,7 @@ def main():
 			s.shutdown(socket.SHUT_RDWR)
 			s.close()
 			# Leave a stop message on screen.
+			mutex.acquire()
 			lcd.clearScreen()
 			t = datetime.datetime.now().strftime('(%Y%m%d %H:%M)')
 			s = "lcdsrv stopped"
@@ -426,6 +439,7 @@ def main():
 			lcd.printText(s, line = l, col = c)
 			lcd.printText(t, line = l + 1, col = c - 1)
 			lcd.setBacklight(False)
+			mutex.release()
 
 if __name__ == '__main__':
 	main()
