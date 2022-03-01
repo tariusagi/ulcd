@@ -49,6 +49,7 @@ Supported fonts:
 
 # Default settings.
 debug = 0
+pause = False
 quit = False
 lcd = None
 backlight = None
@@ -119,9 +120,11 @@ def lcdStat(msg):
 		except NotImplementedError:
 			pass
 
-def handleClientMsg(msg):
+def handleMsg(msg):
 	"""Handle client's message and return a feedback. A message can contains
 	multiple commands, separated by double semi-colons ';;'."""
+	global debug
+	global pause
 	global quit
 	global lcd
 	global backlight
@@ -139,20 +142,37 @@ def handleClientMsg(msg):
 			debugLog(f"Op = \"{op}\", args = \"{args}\".")
 		except ValueError:
 			op = cmd
-			args = None
+			args = ""
 			debugLog(f"Op = \"{op}\", no args.")
 		# Handle the extracted command.
 		if op == "nop":
 			# No operation command. Simply do nothing.
 			pass
-		if op == "quit":
+		elif op == "quit":
 			# Terminate.
 			debugLog("Terminate.")
 			quit = True
 			break
-		if op == "debug":
-			debugLog(f"Set debug level {debug}")
-			lcd.debug(debug)
+		elif op == "debug":
+			try:
+				debug = int(args)
+				debugLog(f"Set debug level {debug}")
+				lcd.setDebug(debug)
+			except ValueError:
+				debugLog("Invalid debug level.")
+				feedback = "Invalid debug level."
+		elif op == "pause":
+			if args == "on":
+				debugLog("Pause on.")
+				pause = True
+			elif args == "off":
+				debugLog("Pause off.")
+				pause = False
+			else:
+				debugLog("Invalid command argument.")
+				feedback = "Invalid command argument."
+		elif pause:
+			feedback = "On pause."
 		elif op == "clear":
 			debugLog("Clear screen.")
 			lcd.clearScreen()
@@ -380,7 +400,7 @@ def main():
 							break
 						msg = data.decode().strip()
 						debugLog(f"Received \"{msg}\" from {addr}.")
-						feedback = handleClientMsg(msg)
+						feedback = handleMsg(msg)
 						if feedback is not None:
 							try:
 								debugLog(f"Sending \"{feedback.strip()}\" back to {addr}")

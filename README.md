@@ -90,7 +90,9 @@ Will tell lcd to set font to 6x8, clear the screen, then print "Hello World" at 
 
 Supported commands are:
 
+- `nop`: doesn't do anything. It is useful to keep the socket loop running.
 - `quit`: terminate the daemon.
+- `pause on|off`: Pause or un-pause updateing LCD (except the status line).
 - `clear`: Clear the LCD.
 - `lineN msg`: Show "msg" at the beginning of line N.
 - `text line col fill|nofill msg`: Show "msg" at the given line and column. If "fill", unused columns in the line willbe filled with spaces.

@@ -62,9 +62,9 @@ class BaseLCD:
 		"""Set setDebug level. Level 0 turn it off."""
 		self._debug = level
 		if level > 0:
-			print("Set setDebug to level", level)
+			print("Set debug level", level)
 		else:
-			print("Turn setDebug off")
+			print("Turn off debug")
 
 
 	def setBacklight(self, state):
