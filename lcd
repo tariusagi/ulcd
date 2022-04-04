@@ -406,7 +406,11 @@ def main():
 				lcdStat(f"{addr[0]}:{addr[1]} connected")
 				with conn:
 					while True:
-						data = conn.recv(1024)
+						data = None
+						try:
+							data = conn.recv(1024)
+						except Exception:
+							pass
 						if not data:
 							# No data? The client must have closed the connection.
 							break
